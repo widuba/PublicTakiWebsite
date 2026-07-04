@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Taki AI Assistant — your everyday AI for getting things done</title>
+<meta name="description" content="Taki is an AI assistant for your iPhone. Just say what you want — set reminders, send texts, track flights, cook hands-free, and get straight answers by voice or text." />
+<style>
+  :root{
+    --bg:#07070e; --bg2:#0d0d1a; --ink:#ececf6; --muted:#9a9ab6;
+    --line:rgba(255,255,255,.09); --card:rgba(255,255,255,.04);
+    --p1:#8b5cf6; --p2:#4b8cff; --p3:#ff5ca8; --p4:#22d3ee;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;color:var(--ink);background:var(--bg);
+    font:17px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(70% 50% at 20% -5%, rgba(139,92,246,.32), transparent 60%),
+      radial-gradient(60% 45% at 100% 5%, rgba(75,140,255,.24), transparent 55%),
+      radial-gradient(55% 50% at 60% 110%, rgba(255,92,168,.16), transparent 60%), var(--bg)}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em}
+  .brand .dot{width:26px;height:26px;border-radius:8px;background:radial-gradient(circle at 38% 30%,#fff,transparent 30%),linear-gradient(135deg,var(--p2),var(--p1))}
+  nav a{color:var(--muted);font-size:14.5px;margin-left:22px}
+  nav a:hover{color:#fff}
+
+  .hero{text-align:center;padding:70px 0 40px}
+  .eyebrow{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:#cbb8ff;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.35);padding:6px 14px;border-radius:999px;margin-bottom:20px}
+  h1{font-size:clamp(38px,7.5vw,68px);line-height:1.04;margin:0 0 16px;letter-spacing:-.03em;font-weight:850}
+  h1 .grad{background:linear-gradient(100deg,var(--p1),var(--p2) 45%,var(--p4));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:clamp(17px,2.4vw,21px);color:#c7c7dc;max-width:640px;margin:0 auto 30px}
+  .cta{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(120deg,var(--p1),var(--p2));color:#fff;
+    font-weight:700;font-size:17px;padding:15px 28px;border-radius:14px;box-shadow:0 18px 50px -16px rgba(75,140,255,.8)}
+  .cta:hover{transform:translateY(-1px)}
+  .cta-sub{display:block;color:var(--muted);font-size:13px;margin-top:14px}
+
+  .orb{width:220px;height:220px;margin:56px auto 0;border-radius:50%;
+    background:radial-gradient(circle at 42% 34%, #fff2, transparent 34%), radial-gradient(circle at 50% 56%, var(--p1), var(--p2) 55%, #0b0b18 100%);
+    box-shadow:0 40px 120px -30px rgba(139,92,246,.75);animation:float 6s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+
+  section{padding:56px 0}
+  h2{font-size:clamp(26px,4vw,38px);text-align:center;letter-spacing:-.02em;margin:0 0 10px;font-weight:800}
+  .section-sub{text-align:center;color:var(--muted);max-width:560px;margin:0 auto 40px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+  .feat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px}
+  .feat .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;margin-bottom:14px;
+    background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(75,140,255,.25));border:1px solid var(--line)}
+  .feat h3{margin:0 0 6px;font-size:18px}
+  .feat p{margin:0;color:var(--muted);font-size:15px}
+
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;counter-reset:s}
+  .step{position:relative;padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--card)}
+  .step::before{counter-increment:s;content:counter(s);display:grid;place-items:center;width:34px;height:34px;border-radius:10px;font-weight:800;
+    background:linear-gradient(135deg,var(--p1),var(--p3));color:#fff;margin-bottom:12px}
+  .step h3{margin:0 0 5px;font-size:17px}
+  .step p{margin:0;color:var(--muted);font-size:15px}
+
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+  .plan{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;text-align:center}
+  .plan.feature{border-color:rgba(139,92,246,.5);box-shadow:0 24px 60px -30px rgba(139,92,246,.7)}
+  .plan .name{font-weight:800;font-size:20px}
+  .plan .price{font-size:30px;font-weight:850;margin:8px 0 2px}
+  .plan .price span{font-size:14px;color:var(--muted);font-weight:600}
+  .plan .cr{color:#bda9ff;font-weight:700;margin:6px 0 12px}
+  .plan ul{list-style:none;padding:0;margin:0;text-align:left;font-size:14.5px;color:#d6d6e6}
+  .plan li{margin:7px 0;padding-left:22px;position:relative}
+  .plan li::before{content:"✓";position:absolute;left:0;color:var(--p4);font-weight:800}
+
+  .final{text-align:center;background:linear-gradient(var(--bg2),var(--bg2)) padding-box,linear-gradient(120deg,var(--p1),var(--p2),var(--p3)) border-box;
+    border:1px solid transparent;border-radius:24px;padding:52px 24px;margin:20px 0 40px}
+  .final h2{margin-bottom:8px}
+
+  footer{border-top:1px solid var(--line);padding:28px 0;color:var(--muted);font-size:14px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  footer a{color:var(--muted)} footer a:hover{color:#fff}
+  .foot-links a{margin-left:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="dot"></span> Taki AI</div>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/support">Support</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <span class="eyebrow">AI assistant for iPhone</span>
+    <h1>Just say it.<br><span class="grad">Taki does the rest.</span></h1>
+    <p class="lede">Set reminders, send texts, track flights, cook hands-free, and get straight answers — all by voice or text, from one assistant that actually does things on your phone.</p>
+    <a class="cta" href="https://apps.apple.com/app/id6786835731"> Download on the App Store</a>
+    <span class="cta-sub">Free to start · Plus, Plus Voice &amp; Pro plans available</span>
+    <div class="orb"></div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>One assistant, everything handled</h2>
+    <p class="section-sub">Taki turns plain language into real actions on your iPhone.</p>
+    <div class="grid">
+      <div class="feat"><div class="ic">⚡</div><h3>Real actions</h3><p>Reminders, calendar events, alarms, timers, texts, directions, music, and smart-home — done by asking.</p></div>
+      <div class="feat"><div class="ic">💬</div><h3>Straight answers</h3><p>Ask anything and get a concise, up-to-date answer — with live info when it matters.</p></div>
+      <div class="feat"><div class="ic">🎙️</div><h3>Hands-free voice</h3><p>Talk to Taki and hear it reply. Great for driving, cooking, or on the go — pick from many voices.</p></div>
+      <div class="feat"><div class="ic">📲</div><h3>Live Activities</h3><p>Track a flight, package, sports score, or your commute right on your Lock Screen and Dynamic Island.</p></div>
+      <div class="feat"><div class="ic">🍳</div><h3>Cooking mode</h3><p>Hands-free recipes that read steps aloud, scale servings, and run multiple timers at once.</p></div>
+      <div class="feat"><div class="ic">🔔</div><h3>Smart alerts</h3><p>Get pinged when a stock or crypto hits your number, or when your team's game ends.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="section-sub">No menus, no setup — just ask.</p>
+    <div class="steps">
+      <div class="step"><h3>Say what you want</h3><p>"Remind me to call Mom at 6," "track my flight UA123," or "what's the weather this weekend."</p></div>
+      <div class="step"><h3>Taki understands</h3><p>It figures out what you mean and does it right on your phone — or gives you a clear answer.</p></div>
+      <div class="step"><h3>You stay in control</h3><p>Review anything before it sends. Your contacts, calendar, and health stay on your device.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <h2>Simple plans</h2>
+    <p class="section-sub">Start free. Upgrade for more monthly credits and voice.</p>
+    <div class="plans">
+      <div class="plan"><div class="name">Plus</div><div class="price">$9.99<span>/mo</span></div><div class="cr">3,000 credits / cycle</div>
+        <ul><li>Every kind of question &amp; action</li><li>Cost scales with brainpower</li><li>Voice available (small extra cost)</li></ul></div>
+      <div class="plan feature"><div class="name">Plus Voice</div><div class="price">$14.99<span>/mo</span></div><div class="cr">4,500 credits / cycle</div>
+        <ul><li>Everything in Plus</li><li>Voice questions included</li><li>More credits every cycle</li></ul></div>
+      <div class="plan"><div class="name">Pro</div><div class="price">$29.99<span>/mo</span></div><div class="cr">15,000 credits / cycle</div>
+        <ul><li>A large monthly balance</li><li>Discount on extra credits</li><li>Best for heavy daily use</li></ul></div>
+    </div>
+    <p class="section-sub" style="margin-top:26px">Need a top-up between cycles? <a href="/buy" style="color:#a9c4ff">Buy extra credits →</a></p>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="final">
+    <h2>Meet your new assistant</h2>
+    <p class="section-sub" style="margin-bottom:24px">Free to start. It'll take it from there.</p>
+    <a class="cta" href="https://apps.apple.com/app/id6786835731"> Download on the App Store</a>
+  </div>
+
+  <footer>
+    <div>&copy; 2026 Christopher Nelson Barlow · Taki AI Assistant</div>
+    <div class="foot-links">
+      <a href="/privacy">Privacy</a>
+      <a href="/terms-of-service">Terms</a>
+      <a href="/support">Support</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

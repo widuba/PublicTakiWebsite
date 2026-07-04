@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Buy Credits — Taki AI Assistant</title>
+<style>
+  :root{
+    --bg:#07070e; --bg2:#0d0d1a; --ink:#ececf6; --muted:#9a9ab6;
+    --line:rgba(255,255,255,.09); --card:rgba(255,255,255,.04);
+    --p1:#8b5cf6; --p2:#4b8cff; --p3:#ff5ca8; --p4:#22d3ee; --ok:#34d399; --err:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--ink);background:var(--bg);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(60% 45% at 18% 0%, rgba(139,92,246,.26), transparent 60%),
+      radial-gradient(55% 40% at 100% 6%, rgba(75,140,255,.2), transparent 55%), var(--bg)}
+  .wrap{max-width:640px;margin:0 auto;padding:56px 22px 90px}
+  .eyebrow{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:#cbb8ff;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.35);padding:6px 14px;border-radius:999px;margin-bottom:16px}
+  h1{font-size:clamp(30px,6vw,44px);line-height:1.05;margin:0 0 8px;letter-spacing:-.02em;font-weight:850;
+    background:linear-gradient(100deg,var(--p1),var(--p2) 50%,var(--p4));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);margin:0 0 28px}
+  label{display:block;font-weight:600;margin:22px 0 8px}
+  .hint{color:var(--muted);font-size:13px;font-weight:400;margin-top:4px}
+  input{width:100%;padding:13px 15px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--ink);font-size:16px}
+  input:focus{outline:none;border-color:var(--p1)}
+  .packs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px}
+  .pack{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:14px 10px;text-align:center;cursor:pointer;transition:.15s}
+  .pack:hover{border-color:var(--p2)}
+  .pack.on{border-color:var(--p1);background:rgba(139,92,246,.14);box-shadow:0 12px 30px -18px rgba(139,92,246,.8)}
+  .pack .c{font-weight:800;font-size:18px}
+  .pack .p{color:var(--muted);font-size:13px;margin-top:2px}
+  .pack .tag{font-size:10px;color:var(--p4);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+  .total{display:flex;justify-content:space-between;align-items:baseline;margin:26px 0 8px;font-size:15px;color:var(--muted)}
+  .total b{color:#fff;font-size:26px;font-weight:850}
+  button.buy{width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(120deg,var(--p1),var(--p2));
+    color:#fff;font-size:17px;font-weight:700;cursor:pointer;box-shadow:0 16px 44px -18px rgba(75,140,255,.85)}
+  button.buy:disabled{opacity:.5;cursor:default;box-shadow:none}
+  button.buy:active{transform:scale(.99)}
+  .msg{margin:16px 0 0;font-size:14px;min-height:18px}
+  .msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+  .banner{border-radius:14px;padding:14px 16px;margin:0 0 22px;font-size:14.5px}
+  .banner.ok{background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.4);color:#a6f0d5}
+  .banner.warn{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffb3b3}
+  .foot{color:var(--muted);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:16px}
+  a{color:#a9c4ff;text-decoration:none} a:hover{color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="eyebrow">Taki AI Assistant</span>
+  <h1>Buy Credits</h1>
+  <p class="sub">Top up your balance instantly. Credits are added to your account and expire 90 days after purchase.</p>
+
+  <div id="banner"></div>
+
+  <div id="form">
+    <label>Your Account ID
+      <span class="hint">Find this in the app under <b>Settings → Account ID</b>, then paste it here.</span>
+    </label>
+    <input id="identity" type="text" placeholder="e.g. apple:0012… or a device ID" autocomplete="off" spellcheck="false" />
+
+    <label>Choose an amount</label>
+    <div class="packs" id="packs"></div>
+
+    <label>Or enter a custom amount
+      <span class="hint" id="rangeHint"></span>
+    </label>
+    <input id="custom" type="number" inputmode="numeric" placeholder="Number of credits" />
+
+    <div class="total"><span>Total</span><b id="total">—</b></div>
+    <button class="buy" id="buy" disabled>Continue to payment</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="foot">
+    Payments are processed securely by Stripe — we never see your card details. Purchases are final except where required by law.
+    <br />Questions? <a href="/support">Contact support</a> · <a href="/">Back to Taki AI</a>
+  </div>
+</div>
+
+<script>
+  const API = "https://takiaiserver.onrender.com";
+  const $ = (id) => document.getElementById(id);
+  let MIN = 1000, MAX = 100000, selected = 0;
+
+  // Mirror the server's pricing (server is authoritative on charge).
+  function priceUsd(c){
+    if(!(c>=MIN && c<=MAX)) return null;
+    const per = c>=15000?0.004 : c>=5000?0.0044 : 0.005;
+    return c*per;
+  }
+  const fmt = (n)=>n.toLocaleString();
+  const usd = (n)=>"$"+n.toFixed(2);
+
+  const PRESETS = [1000,5000,15000];
+  function renderPacks(){
+    $("packs").innerHTML = PRESETS.map(c=>{
+      const p = priceUsd(c);
+      const tag = c>=15000?"Best value":c>=5000?"Popular":"";
+      return `<div class="pack" data-c="${c}"><div class="c">${fmt(c)}</div><div class="p">${usd(p)}</div>${tag?`<div class="tag">${tag}</div>`:""}</div>`;
+    }).join("");
+    $("packs").querySelectorAll(".pack").forEach(el=>el.onclick=()=>{ $("custom").value=""; select(+el.dataset.c); });
+  }
+  function select(c){
+    selected = c;
+    $("packs").querySelectorAll(".pack").forEach(el=>el.classList.toggle("on", +el.dataset.c===c && !$("custom").value));
+    const p = priceUsd(c);
+    $("total").textContent = p!=null ? usd(p) : "—";
+    $("buy").disabled = !(p!=null && $("identity").value.trim());
+  }
+  $("custom").addEventListener("input", ()=>{
+    const c = Math.floor(+$("custom").value);
+    $("packs").querySelectorAll(".pack").forEach(el=>el.classList.remove("on"));
+    if(c) select(c); else select(0);
+  });
+  $("identity").addEventListener("input", ()=>select(selected));
+
+  $("buy").onclick = async ()=>{
+    const identity = $("identity").value.trim();
+    const credits = selected;
+    if(!identity || !priceUsd(credits)) return;
+    $("buy").disabled = true; setMsg("Starting secure checkout…");
+    try{
+      const r = await fetch(API+"/api/credits/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity,credits})});
+      const d = await r.json();
+      if(d.url){ window.location.href = d.url; return; }
+      setMsg(d.error||"Could not start checkout.","err"); $("buy").disabled=false;
+    }catch(e){ setMsg("Network error — please try again.","err"); $("buy").disabled=false; }
+  };
+  function setMsg(t,k){ $("msg").textContent=t||""; $("msg").className="msg"+(k?" "+k:""); }
+
+  // Status banner after returning from Stripe.
+  const status = new URLSearchParams(location.search).get("status");
+  if(status==="success") $("banner").innerHTML = '<div class="banner ok">✅ Payment received! Your credits have been added — reopen the app to see your new balance.</div>';
+  else if(status==="canceled") $("banner").innerHTML = '<div class="banner warn">Checkout canceled — no charge was made.</div>';
+
+  // Load config (min/max + whether top-ups are live).
+  (async ()=>{
+    try{
+      const c = await (await fetch(API+"/api/credits/topup-config")).json();
+      if(c && typeof c.min==="number"){ MIN=c.min; MAX=c.max; }
+      $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
+      if(c && c.enabled===false){
+        $("form").style.display="none";
+        $("banner").innerHTML = '<div class="banner warn">Credit top-ups aren’t available just yet — check back soon.</div>';
+      }
+    }catch(e){ $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`; }
+    renderPacks(); select(PRESETS[0]);
+  })();
+</script>
+</body>
+</html>
