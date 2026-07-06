@@ -90,7 +90,7 @@ function renderKpis(){
 }
 
 function last30(){ const days=[]; for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(dayKey(d.getTime()));} return days; }
-function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); Chart.defaults.color="#8f8fae"; Chart.defaults.font.family="-apple-system,Segoe UI,Roboto,sans-serif"; charts[id]=new Chart($(id),cfg); }
+function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); Chart.defaults.color="#5f574d"; Chart.defaults.font.family="-apple-system,Segoe UI,Roboto,sans-serif"; charts[id]=new Chart($(id),cfg); }
 
 function renderCharts(){
   const days=last30(), di=Object.fromEntries(days.map((d,i)=>[d,i]));
@@ -98,12 +98,12 @@ function renderCharts(){
   const rev=Array(30).fill(0);
   ROWS.forEach(r=>(r.purchases||[]).forEach(p=>{const k=dayKey(p.at);if(k in di)rev[di[k]]+=p.amountUsd;}));
   mkChart("cRev",{type:"bar",data:{labels:days.map(d=>d.slice(5)),datasets:[{data:rev,backgroundColor:"rgba(194,95,44,.72)",borderRadius:4}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"rgba(255,255,255,.05)"},ticks:{callback:v=>"$"+v}}}}});
+    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"rgba(31,27,21,.12)"},ticks:{callback:v=>"$"+v}}}}});
   // new users per day
   const nu=Array(30).fill(0);
   ROWS.forEach(r=>{const k=dayKey(r.firstSeenAt);if(k in di)nu[di[k]]++;});
   mkChart("cUsers",{type:"line",data:{labels:days.map(d=>d.slice(5)),datasets:[{data:nu,borderColor:"#0f766e",backgroundColor:"rgba(15,118,110,.16)",fill:true,tension:.35,pointRadius:0}]},
-    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"rgba(255,255,255,.05)"},ticks:{precision:0}}}}});
+    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"rgba(31,27,21,.12)"},ticks:{precision:0}}}}});
   // plan distribution
   const tiers=["free","plus","plus_voice","pro"]; const counts=tiers.map(t=>ROWS.filter(r=>r.tier===t).length);
   mkChart("cPlan",{type:"doughnut",data:{labels:["Free","Plus","Plus Voice","Pro"],datasets:[{data:counts,backgroundColor:["#6f675b","#0f766e","#c25f2c","#d79a2b"],borderWidth:0}]},
@@ -111,7 +111,7 @@ function renderCharts(){
   // top users by credits
   const top=[...ROWS].sort((a,b)=>(b.creditsUsed||0)-(a.creditsUsed||0)).slice(0,8);
   mkChart("cCredits",{type:"bar",data:{labels:top.map(r=>(r.apple&&r.apple.email)||r.identity.slice(0,14)),datasets:[{data:top.map(r=>r.creditsUsed||0),backgroundColor:"rgba(215,154,43,.7)",borderRadius:4}]},
-    options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:"rgba(255,255,255,.05)"}},y:{grid:{display:false}}}}});
+    options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:"rgba(31,27,21,.12)"}},y:{grid:{display:false}}}}});
 }
 
 function renderSegs(){
