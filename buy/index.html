@@ -83,7 +83,7 @@
     <label>Your Account ID
       <span class="hint">Find this in the app under <b>Settings → Account ID</b> — it's an 8-digit number. Paste it here.</span>
     </label>
-    <input id="identity" type="text" inputmode="numeric" maxlength="8" placeholder="e.g. 10234567" autocomplete="off" spellcheck="false" />
+    <input id="identity" type="text" inputmode="numeric" maxlength="32" placeholder="e.g. 10234567" autocomplete="off" spellcheck="false" />
     <button class="buy" id="next" disabled>Next</button>
     <div class="msg" id="msg1"></div>
   </div>
@@ -132,17 +132,22 @@
     return (c * CENTS_PER_CREDIT) / 100;
   }
 
+  function normalizeIdentity(v){
+    return String(v || "").replace(/\D/g,"").slice(0,8);
+  }
+
   /* ---------- STEP 1: verify account ---------- */
   $("identity").addEventListener("input", ()=>{
     // digits only, enable Next at 8 digits
-    $("identity").value = $("identity").value.replace(/[^0-9]/g,"").slice(0,8);
+    $("identity").value = normalizeIdentity($("identity").value);
     $("next").disabled = $("identity").value.length !== 8;
     setMsg1("");
   });
   $("identity").addEventListener("keydown",(e)=>{ if(e.key==="Enter" && !$("next").disabled) $("next").click(); });
 
   $("next").onclick = async ()=>{
-    const identity = $("identity").value.trim();
+    const identity = normalizeIdentity($("identity").value);
+    $("identity").value = identity;
     $("next").disabled = true; setMsg1("Checking your account…");
     try{
       const r = await fetch(API+"/api/credits/account-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity})});
