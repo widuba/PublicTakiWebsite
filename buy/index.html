@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Buy Credits — Taki AI Assistant</title>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body class="site-buy">
+<div class="wrap">
+  <span class="eyebrow">Taki AI Assistant</span>
+  <h1>Buy Credits</h1>
+  <p class="sub">Top up your balance instantly. Credits are added to your account and expire 90 days after purchase. A subscription is a much better value per credit — top-ups are for topping off.</p>
+
+  <div id="banner"></div>
+
+  <div class="steps">
+    <div class="s active" id="step1dot"><span class="dot">1</span> Account</div>
+    <div class="bar"></div>
+    <div class="s" id="step2dot"><span class="dot">2</span> Amount</div>
+  </div>
+
+  <!-- STEP 1 — verify account -->
+  <div id="stepAccount">
+    <label>Your Account ID
+      <span class="hint">Find this in the app under <b>Settings → Account ID</b> — it's an 8-digit number. Paste it here.</span>
+    </label>
+    <input id="identity" type="text" inputmode="numeric" maxlength="32" placeholder="e.g. 10234567" autocomplete="off" spellcheck="false" />
+    <button class="buy" id="next" disabled>Next</button>
+    <div class="msg" id="msg1"></div>
+  </div>
+
+  <!-- STEP 2 — choose amount + pay -->
+  <div id="stepAmount" class="hidden">
+    <div class="acct">
+      <div>
+        <div class="id" id="acctId">—</div>
+        <div class="who" id="acctWho">Verified account</div>
+      </div>
+      <span class="badge" id="acctBadge">—</span>
+    </div>
+    <button class="link-btn" id="changeAcct">← Use a different account</button>
+
+    <label>Choose an amount</label>
+    <div class="packs" id="packs"></div>
+
+    <label>Or enter a custom amount
+      <span class="hint" id="rangeHint"></span>
+    </label>
+    <input id="custom" type="number" inputmode="numeric" placeholder="Number of credits" />
+
+    <div class="total"><span id="rateLabel">Total</span><b id="total">—</b></div>
+    <button class="buy" id="buy" disabled>Continue to payment</button>
+    <div class="msg" id="msg2"></div>
+  </div>
+
+  <div class="foot">
+    Payments are processed securely by Stripe — we never see your card details. Purchases are final except where required by law.
+    <br />Questions? <a href="../support/">Contact support</a> · <a href="../">Back to Taki AI</a>
+  </div>
+</div>
+
+<script>
+  const API = "https://takiaiserver.onrender.com";
+  const $ = (id) => document.getElementById(id);
+  let MIN = 500, MAX = 500000, CENTS_PER_CREDIT = 1, selected = 0;
+  let account = { id: "", isPro: false, tier: "free" };
+
+  const fmt = (n)=>n.toLocaleString();
+  const usd = (n)=>"$"+n.toFixed(2);
+  // Mirror the server's pricing (server stays authoritative on the real charge).
+  function priceUsd(c){
+    if(!(c>=MIN && c<=MAX)) return null;
+    return (c * CENTS_PER_CREDIT) / 100;
+  }
+
+  function normalizeIdentity(v){
+    return String(v || "").replace(/\D/g,"").slice(0,8);
+  }
+
+  /* ---------- STEP 1: verify account ---------- */
+  $("identity").addEventListener("input", ()=>{
+    // digits only, enable Next at 8 digits
+    $("identity").value = normalizeIdentity($("identity").value);
+    $("next").disabled = $("identity").value.length !== 8;
+    setMsg1("");
+  });
+  $("identity").addEventListener("keydown",(e)=>{ if(e.key==="Enter" && !$("next").disabled) $("next").click(); });
+
+  $("next").onclick = async ()=>{
+    const identity = normalizeIdentity($("identity").value);
+    $("identity").value = identity;
+    $("next").disabled = true; setMsg1("Checking your account…");
+    try{
+      const r = await fetch(API+"/api/credits/account-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity})});
+      const d = await r.json();
+      if(!d.valid){ setMsg1(d.reason || "That account can't buy credits.","err"); $("next").disabled=false; return; }
+      account = { id: identity, isPro: !!d.isPro, tier: d.tier || (d.isPro ? "pro" : "free") };
+      if(typeof d.min==="number"){ MIN=d.min; MAX=d.max; }
+      if(typeof d.centsPerCredit==="number"){ CENTS_PER_CREDIT=d.centsPerCredit; }
+      setMsg1("");
+      showAmountStep();
+    }catch(e){ setMsg1("Network error — please try again.","err"); $("next").disabled=false; }
+  };
+
+  /* ---------- STEP 2: amount + pay ---------- */
+  const PRESETS = [500,5000,25000];
+  function renderPacks(){
+    $("packs").innerHTML = PRESETS.map(c=>{
+      const p = priceUsd(c);
+      return `<div class="pack" data-c="${c}"><div class="c">${fmt(c)}</div><div class="p">${p!=null?usd(p):"—"}</div></div>`;
+    }).join("");
+    $("packs").querySelectorAll(".pack").forEach(el=>el.onclick=()=>{ $("custom").value=""; select(+el.dataset.c); });
+  }
+  function select(c){
+    selected = c;
+    $("packs").querySelectorAll(".pack").forEach(el=>el.classList.toggle("on", +el.dataset.c===c && !$("custom").value));
+    const p = priceUsd(c);
+    $("total").textContent = p!=null ? usd(p) : "—";
+    $("buy").disabled = p==null;
+  }
+  $("custom").addEventListener("input", ()=>{
+    const c = Math.floor(+$("custom").value);
+    $("packs").querySelectorAll(".pack").forEach(el=>el.classList.remove("on"));
+    if(c) select(c); else select(0);
+  });
+
+  function showAmountStep(){
+    $("stepAccount").classList.add("hidden");
+    $("stepAmount").classList.remove("hidden");
+    $("step1dot").classList.remove("active"); $("step1dot").classList.add("done"); $("step1dot").querySelector(".dot").textContent="✓";
+    $("step2dot").classList.add("active");
+    $("acctId").textContent = "Account "+account.id;
+    const rate = (CENTS_PER_CREDIT).toFixed(CENTS_PER_CREDIT % 1 ? 1 : 0);
+    if(account.tier === "pro"){
+      $("acctBadge").textContent = "Pro · 20% off"; $("acctBadge").className="badge";
+      $("acctWho").textContent = "Pro member — discounted credit pricing";
+    } else if(account.tier === "plus_voice"){
+      $("acctBadge").textContent = "Plus Voice"; $("acctBadge").className="badge";
+      $("acctWho").textContent = "Plus Voice member — standard credit pricing";
+    } else if(account.tier === "plus"){
+      $("acctBadge").textContent = "Plus"; $("acctBadge").className="badge";
+      $("acctWho").textContent = "Plus member — standard credit pricing";
+    } else {
+      $("acctBadge").textContent = "Standard"; $("acctBadge").className="badge free";
+      $("acctWho").textContent = "No active plan — standard credit pricing";
+    }
+    $("rateLabel").textContent = `Total · ${rate}¢ per credit`;
+    $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
+    renderPacks(); select(PRESETS[0]);
+  }
+
+  $("changeAcct").onclick = ()=>{
+    $("stepAmount").classList.add("hidden");
+    $("stepAccount").classList.remove("hidden");
+    $("step2dot").classList.remove("active");
+    $("step1dot").classList.remove("done"); $("step1dot").classList.add("active"); $("step1dot").querySelector(".dot").textContent="1";
+    $("next").disabled = $("identity").value.length !== 8;
+  };
+
+  $("buy").onclick = async ()=>{
+    const credits = selected;
+    if(!priceUsd(credits)) return;
+    $("buy").disabled = true; setMsg2("Starting secure checkout…");
+    try{
+      const r = await fetch(API+"/api/credits/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity:account.id,credits})});
+      const d = await r.json();
+      if(d.url){ window.location.href = d.url; return; }
+      setMsg2(d.error||"Could not start checkout.","err"); $("buy").disabled=false;
+    }catch(e){ setMsg2("Network error — please try again.","err"); $("buy").disabled=false; }
+  };
+
+  function setMsg1(t,k){ $("msg1").textContent=t||""; $("msg1").className="msg"+(k?" "+k:""); }
+  function setMsg2(t,k){ $("msg2").textContent=t||""; $("msg2").className="msg"+(k?" "+k:""); }
+
+  // Status banner after returning from Stripe.
+  const status = new URLSearchParams(location.search).get("status");
+  if(status==="success") $("banner").innerHTML = '<div class="banner ok">✅ Payment received! Your credits have been added — reopen the app to see your new balance.</div>';
+  else if(status==="canceled") $("banner").innerHTML = '<div class="banner warn">Checkout canceled — no charge was made.</div>';
+
+  // Load config (min/max + whether top-ups are live).
+  (async ()=>{
+    try{
+      const c = await (await fetch(API+"/api/credits/topup-config")).json();
+      if(c && typeof c.min==="number"){ MIN=c.min; MAX=c.max; }
+      if(c && typeof c.centsPerCredit==="number"){ CENTS_PER_CREDIT=c.centsPerCredit; }
+      if(c && c.enabled===false){
+        $("stepAccount").classList.add("hidden");
+        document.querySelector(".steps").classList.add("hidden");
+        $("banner").innerHTML = '<div class="banner warn">Credit top-ups aren’t available just yet — check back soon.</div>';
+      }
+    }catch(e){ /* keep defaults */ }
+  })();
+</script>
+</body>
+</html>

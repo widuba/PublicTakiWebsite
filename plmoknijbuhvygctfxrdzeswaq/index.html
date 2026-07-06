@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<title>Taki — Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="../styles.css" />
+</head>
+<body class="site-admin">
+<div class="topbar">
+  <div class="logo"><span class="dot"></span> Taki Admin</div>
+  <div class="spacer"></div>
+  <input id="secret" type="password" placeholder="Admin secret" autocomplete="off" />
+  <button class="primary" id="load">Load</button>
+  <button id="refresh" title="Reload">↻</button>
+</div>
+
+<div class="wrap">
+  <div class="msg" id="msg">Enter your admin secret and press Load.</div>
+  <div id="app" style="display:none">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="charts">
+      <div class="card"><h3>Revenue (last 30 days)</h3><canvas id="cRev"></canvas></div>
+      <div class="card"><h3>Plan distribution</h3><canvas id="cPlan"></canvas></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h3>New users (last 30 days)</h3><canvas id="cUsers"></canvas></div>
+      <div class="card"><h3>Top users by credits used</h3><canvas id="cCredits"></canvas></div>
+    </div>
+
+    <div class="segs" id="segs"></div>
+    <input id="filter" type="search" placeholder="Search identity, email, IP, device…" style="width:100%;margin-bottom:12px" />
+    <div class="tablewrap"><div class="tscroll"><table id="tbl"><thead></thead><tbody></tbody></table></div></div>
+  </div>
+</div>
+
+<script>
+const API="https://takiaiserver.onrender.com";
+const $=(id)=>document.getElementById(id);
+const secret=()=>$("secret").value;
+$("secret").value=sessionStorage.getItem("taki_admin_secret")||"";
+$("secret").addEventListener("input",()=>sessionStorage.setItem("taki_admin_secret",$("secret").value));
+const esc=(x)=>String(x==null?"":x).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const usd=(n)=>"$"+(Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const num=(n)=>(Number(n)||0).toLocaleString();
+const dt=(ms)=>ms?new Date(ms).toLocaleString():"—";
+const ago=(ms)=>{if(!ms)return"—";const m=Math.floor((Date.now()-ms)/60000);if(m<60)return m+"m";const h=Math.floor(m/60);if(h<48)return h+"h";return Math.floor(h/24)+"d";};
+const TIER_PRICE={plus:9.99,plus_voice:14.99,pro:29.99};
+const dayKey=(ms)=>{const d=new Date(ms);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+function setMsg(t,k){$("msg").textContent=t||"";$("msg").className="msg"+(k?" "+k:"");}
+
+let ROWS=[],TOTALS={},seg="all",sortKey="lastSeenAt",sortDir=-1,charts={};
+
+async function api(path,body){
+  const r=await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({secret:secret()},body||{}))});
+  if(r.status===403) throw new Error("Wrong admin secret.");
+  if(!r.ok) throw new Error("Request failed ("+r.status+").");
+  return r.json();
+}
+async function load(){
+  if(!secret()) return setMsg("Enter the admin secret.","err");
+  setMsg("Loading…");
+  try{ const d=await api("/api/admin/users"); ROWS=d.users||[]; TOTALS=d.totals||{}; $("app").style.display=""; renderAll(); setMsg(""); }
+  catch(e){ setMsg(e.message,"err"); }
+}
+$("load").onclick=load; $("refresh").onclick=load;
+$("secret").addEventListener("keydown",e=>{if(e.key==="Enter")load();});
+
+function renderAll(){ renderKpis(); renderCharts(); renderSegs(); renderTable(); }
+
+function renderKpis(){
+  const paying=ROWS.filter(r=>r.tier&&r.tier!=="free");
+  const mrr=paying.reduce((s,r)=>s+(TIER_PRICE[r.tier]||0),0);
+  const susp=ROWS.filter(r=>r.status==="suspended").length;
+  const banned=ROWS.filter(r=>r.status==="terminated").length;
+  const cards=[
+    ["Total users",num(TOTALS.users),ROWS.length+" tracked",""],
+    ["Paying users",num(paying.length),(ROWS.length?Math.round(paying.length/ROWS.length*100):0)+"% conversion",""],
+    ["MRR",usd(mrr),"monthly recurring","ok"],
+    ["Net revenue",usd(TOTALS.net),"all-time, after fees","ok"],
+    ["Cost to serve",usd(TOTALS.cost),"all-time AI cost","err"],
+    ["Profit",usd(TOTALS.profit),"net − cost",(TOTALS.profit>=0?"ok":"err")],
+    ["Suspended",num(susp),"awaiting review",(susp?"warn":"")],
+    ["Banned",num(banned),"terminated",(banned?"err":"")]
+  ];
+  $("kpis").innerHTML=cards.map(([k,v,s,c])=>`<div class="kpi"><div class="glow" style="background:${c==='err'?'#b63d30':c==='warn'?'#d79a2b':c==='ok'?'#27724f':'#0f766e'}"></div><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`).join("");
+}
+
+function last30(){ const days=[]; for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(dayKey(d.getTime()));} return days; }
+function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); Chart.defaults.color="#8f8fae"; Chart.defaults.font.family="-apple-system,Segoe UI,Roboto,sans-serif"; charts[id]=new Chart($(id),cfg); }
+
+function renderCharts(){
+  const days=last30(), di=Object.fromEntries(days.map((d,i)=>[d,i]));
+  // revenue per day
+  const rev=Array(30).fill(0);
+  ROWS.forEach(r=>(r.purchases||[]).forEach(p=>{const k=dayKey(p.at);if(k in di)rev[di[k]]+=p.amountUsd;}));
+  mkChart("cRev",{type:"bar",data:{labels:days.map(d=>d.slice(5)),datasets:[{data:rev,backgroundColor:"rgba(194,95,44,.72)",borderRadius:4}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"rgba(255,255,255,.05)"},ticks:{callback:v=>"$"+v}}}}});
+  // new users per day
+  const nu=Array(30).fill(0);
+  ROWS.forEach(r=>{const k=dayKey(r.firstSeenAt);if(k in di)nu[di[k]]++;});
+  mkChart("cUsers",{type:"line",data:{labels:days.map(d=>d.slice(5)),datasets:[{data:nu,borderColor:"#0f766e",backgroundColor:"rgba(15,118,110,.16)",fill:true,tension:.35,pointRadius:0}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8}},y:{grid:{color:"rgba(255,255,255,.05)"},ticks:{precision:0}}}}});
+  // plan distribution
+  const tiers=["free","plus","plus_voice","pro"]; const counts=tiers.map(t=>ROWS.filter(r=>r.tier===t).length);
+  mkChart("cPlan",{type:"doughnut",data:{labels:["Free","Plus","Plus Voice","Pro"],datasets:[{data:counts,backgroundColor:["#6f675b","#0f766e","#c25f2c","#d79a2b"],borderWidth:0}]},
+    options:{cutout:"62%",plugins:{legend:{position:"bottom",labels:{boxWidth:12,padding:12}}}}});
+  // top users by credits
+  const top=[...ROWS].sort((a,b)=>(b.creditsUsed||0)-(a.creditsUsed||0)).slice(0,8);
+  mkChart("cCredits",{type:"bar",data:{labels:top.map(r=>(r.apple&&r.apple.email)||r.identity.slice(0,14)),datasets:[{data:top.map(r=>r.creditsUsed||0),backgroundColor:"rgba(215,154,43,.7)",borderRadius:4}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:"rgba(255,255,255,.05)"}},y:{grid:{display:false}}}}});
+}
+
+function renderSegs(){
+  const defs=[["all","All",ROWS.length],["paying","Paying",ROWS.filter(r=>r.tier!=="free").length],
+    ["free","Free",ROWS.filter(r=>r.tier==="free").length],["suspended","Suspended",ROWS.filter(r=>r.status==="suspended").length],
+    ["banned","Banned",ROWS.filter(r=>r.status==="terminated").length]];
+  $("segs").innerHTML=defs.map(([k,l,n])=>`<div class="seg ${seg===k?'on':''}" data-s="${k}">${l} · ${n}</div>`).join("");
+  $("segs").querySelectorAll(".seg").forEach(el=>el.onclick=()=>{seg=el.dataset.s;renderSegs();renderTable();});
+}
+
+const COLS=[
+  ["identity","User",r=>`<span class="id mono" title="${esc(r.identity)}">${esc((r.apple&&r.apple.email)||r.identity)}</span>`],
+  ["deviceType","Device",r=>esc(r.deviceType||"—")],
+  ["tier","Plan",r=>`<span class="pill ${r.tier}">${r.tier.replace("_"," ")}</span>`],
+  ["balance","Balance",r=>`<span class="num">${num(r.balance)}</span>`],
+  ["creditsUsed","Used",r=>`<span class="num">${num(r.creditsUsed)}</span>`],
+  ["costUsd","Cost",r=>`<span class="num">${usd(r.costUsd)}</span>`],
+  ["netRevenueUsd","Net rev",r=>`<span class="num">${usd(r.netRevenueUsd)}</span>`],
+  ["profitUsd","Profit",r=>`<span class="num prof ${r.profitUsd>=0?'pos':'neg'}">${usd(r.profitUsd)}</span>`],
+  ["status","Status",r=>`<span class="st ${r.status}">${r.status}${r.strikes?` (${r.strikes})`:""}</span>`],
+  ["requestCount","Reqs",r=>`<span class="num">${num(r.requestCount)}</span>`],
+  ["lastSeenAt","Seen",r=>ago(r.lastSeenAt)],
+];
+function filtered(){
+  const q=($("filter").value||"").toLowerCase();
+  return ROWS.filter(r=>{
+    if(seg==="paying"&&r.tier==="free")return false;
+    if(seg==="free"&&r.tier!=="free")return false;
+    if(seg==="suspended"&&r.status!=="suspended")return false;
+    if(seg==="banned"&&r.status!=="terminated")return false;
+    return !q||JSON.stringify(r).toLowerCase().includes(q);
+  }).sort((a,b)=>{const x=a[sortKey],y=b[sortKey];const av=Array.isArray(x)?x.length:x,bv=Array.isArray(y)?y.length:y;return((av>bv)-(av<bv))*sortDir;});
+}
+function renderTable(){
+  const rows=filtered();
+  $("tbl").querySelector("thead").innerHTML="<tr>"+COLS.map(c=>`<th data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir<0?" ▾":" ▴"):""}</th>`).join("")+"</tr>";
+  const tb=$("tbl").querySelector("tbody");
+  if(!rows.length){ tb.innerHTML=`<tr><td colspan="${COLS.length}"><div class="empty">No users in this view.</div></td></tr>`; wireHead(); return; }
+  tb.innerHTML=rows.map((r,i)=>`<tr class="main" data-i="${i}">`+COLS.map(c=>`<td>${c[2](r)}</td>`).join("")+`</tr><tr class="detail" id="d${i}" style="display:none"><td colspan="${COLS.length}">${detail(r,i)}</td></tr>`).join("");
+  tb.querySelectorAll("tr.main").forEach(tr=>tr.onclick=(e)=>{if(e.target.closest("button"))return;const d=$("d"+tr.dataset.i);d.style.display=d.style.display==="none"?"":"none";});
+  tb.querySelectorAll("button[data-act]").forEach(b=>b.onclick=()=>action(b.dataset.act,b.dataset.id));
+  wireHead(); window._filtered=rows;
+}
+function wireHead(){ $("tbl").querySelectorAll("th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}renderTable();}); }
+function detail(r,i){
+  const hist=(r.tierHistory||[]).slice().reverse().map(h=>`<div class="row">${esc(h.tier.replace("_"," "))} <span class="muted">· ${esc(h.source)} · ${dt(h.at)}</span></div>`).join("")||'<div class="row muted">—</div>';
+  const buys=(r.purchases||[]).slice().reverse().map(p=>`<div class="row">${usd(p.amountUsd)} <span class="muted">· ${esc(p.kind)}${p.tier?" "+esc(p.tier.replace("_"," ")):""}${p.credits?" · "+num(p.credits)+" cr":""} · ${dt(p.at)}</span></div>`).join("")||'<div class="row muted">none</div>';
+  const nb=(r.ipNeighbors||[]).map(n=>`<div class="row mono">${esc(n)}</div>`).join("")||'<div class="row muted">none</div>';
+  const linked=(r.linkedDevices||[]).map(n=>`<div class="row mono">${esc(n)}</div>`).join("")||'<div class="row muted">none</div>';
+  const apple=r.apple?`${esc(r.apple.name||"")}${r.apple.email?" · "+esc(r.apple.email):""}`.trim()||"signed in":"—";
+  const acts=r.status==="terminated"?"":`<div class="act">${r.status==="suspended"?`<button class="reinstate" data-act="reinstate" data-id="${esc(r.identity)}">Reinstate</button>`:""}<button class="terminate" data-act="terminate" data-id="${esc(r.identity)}">Terminate &amp; Ban</button></div>`;
+  return `<div class="cols">
+    <div><h4>Identity</h4><div class="row mono">${esc(r.identity)}</div><div class="row">Apple: <span class="muted">${apple}</span></div><div class="row">Gross revenue: <span class="muted">${usd(r.grossRevenueUsd)}</span></div><div class="row">First seen: <span class="muted">${dt(r.firstSeenAt)}</span></div>${acts}</div>
+    <div><h4>Plan history</h4>${hist}</div>
+    <div><h4>Purchases</h4>${buys}</div>
+    <div><h4>Linked devices (same account)</h4>${linked}<h4 style="margin-top:12px">IPs · same-IP identities</h4><div class="row muted">${esc((r.ips||[]).join(", ")||"—")}</div>${nb}</div>
+  </div>`;
+}
+async function action(act,id){
+  if(act==="terminate"&&!confirm("Permanently ban this account, its devices, IP(s), and linked Apple ID(s)?\nThis CANNOT be undone.\n\n"+id))return;
+  if(act==="reinstate"&&!confirm("Reinstate and clear strikes?\n\n"+id))return;
+  try{ await api("/api/admin/"+act,{identity:id}); setMsg((act==="terminate"?"Terminated ":"Reinstated ")+id); await load(); }
+  catch(e){ setMsg(e.message,"err"); }
+}
+$("filter").addEventListener("input",()=>{ if(ROWS.length) renderTable(); });
+if(secret()) load();
+</script>
+</body>
+</html>
