@@ -43,6 +43,7 @@
   .total b{color:#fff;font-size:26px;font-weight:850}
   button.buy{width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(120deg,var(--p1),var(--p2));
     color:#fff;font-size:17px;font-weight:700;cursor:pointer;box-shadow:0 16px 44px -18px rgba(75,140,255,.85)}
+  #next{margin-top:14px}
   button.buy:disabled{opacity:.5;cursor:default;box-shadow:none}
   button.buy:active{transform:scale(.99)}
   .link-btn{background:none;border:none;color:#a9c4ff;font-size:14px;cursor:pointer;padding:0;margin-top:16px}
@@ -122,7 +123,7 @@
   const API = "https://takiaiserver.onrender.com";
   const $ = (id) => document.getElementById(id);
   let MIN = 500, MAX = 500000, CENTS_PER_CREDIT = 1, selected = 0;
-  let account = { id: "", isPro: false };
+  let account = { id: "", isPro: false, tier: "free" };
 
   const fmt = (n)=>n.toLocaleString();
   const usd = (n)=>"$"+n.toFixed(2);
@@ -153,7 +154,7 @@
       const r = await fetch(API+"/api/credits/account-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity})});
       const d = await r.json();
       if(!d.valid){ setMsg1(d.reason || "That account can't buy credits.","err"); $("next").disabled=false; return; }
-      account = { id: identity, isPro: !!d.isPro };
+      account = { id: identity, isPro: !!d.isPro, tier: d.tier || (d.isPro ? "pro" : "free") };
       if(typeof d.min==="number"){ MIN=d.min; MAX=d.max; }
       if(typeof d.centsPerCredit==="number"){ CENTS_PER_CREDIT=d.centsPerCredit; }
       setMsg1("");
@@ -190,12 +191,18 @@
     $("step2dot").classList.add("active");
     $("acctId").textContent = "Account "+account.id;
     const rate = (CENTS_PER_CREDIT).toFixed(CENTS_PER_CREDIT % 1 ? 1 : 0);
-    if(account.isPro){
+    if(account.tier === "pro"){
       $("acctBadge").textContent = "Pro · 20% off"; $("acctBadge").className="badge";
       $("acctWho").textContent = "Pro member — discounted credit pricing";
+    } else if(account.tier === "plus_voice"){
+      $("acctBadge").textContent = "Plus Voice"; $("acctBadge").className="badge";
+      $("acctWho").textContent = "Plus Voice member — standard credit pricing";
+    } else if(account.tier === "plus"){
+      $("acctBadge").textContent = "Plus"; $("acctBadge").className="badge";
+      $("acctWho").textContent = "Plus member — standard credit pricing";
     } else {
       $("acctBadge").textContent = "Standard"; $("acctBadge").className="badge free";
-      $("acctWho").textContent = "Verified account";
+      $("acctWho").textContent = "No active plan — standard credit pricing";
     }
     $("rateLabel").textContent = `Total · ${rate}¢ per credit`;
     $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
