@@ -106,9 +106,10 @@
   /* ---------- STEP 2: amount + pay ---------- */
   const PRESETS = [500,5000,25000];
   function renderPacks(){
+    const presetUsd = (n)=>Math.abs(n-Math.round(n))<0.001 ? "$"+Math.round(n) : usd(n);
     $("packs").innerHTML = PRESETS.map(c=>{
       const p = priceUsd(c);
-      return `<div class="pack" data-c="${c}"><div class="c">${fmt(c)}</div><div class="p">${p!=null?usd(p):"—"}</div></div>`;
+      return `<div class="pack" data-c="${c}"><div class="c">${fmt(c)} credits</div><div class="p">${p!=null?presetUsd(p):"—"}</div></div>`;
     }).join("");
     $("packs").querySelectorAll(".pack").forEach(el=>el.onclick=()=>{ $("custom").value=""; select(+el.dataset.c); });
   }
