@@ -162,7 +162,7 @@ function detail(r,i){
   const nb=(r.ipNeighbors||[]).map(n=>`<div class="row mono">${esc(n)}</div>`).join("")||'<div class="row muted">none</div>';
   const linked=(r.linkedDevices||[]).map(n=>`<div class="row mono">${esc(n)}</div>`).join("")||'<div class="row muted">none</div>';
   const apple=r.apple?`${esc(r.apple.name||"")}${r.apple.email?" · "+esc(r.apple.email):""}`.trim()||"signed in":"—";
-  const acts=r.status==="terminated"?"":`<div class="act">${r.status==="suspended"?`<button class="reinstate" data-act="reinstate" data-id="${esc(r.identity)}">Reinstate</button>`:""}<button class="terminate" data-act="terminate" data-id="${esc(r.identity)}">Terminate &amp; Ban</button></div>`;
+  const acts=r.status==="terminated"?"":`<div class="act"><button data-act="terminate-preview" data-id="${esc(r.identity)}">Preview ban impact</button><button data-act="test-restrict" data-id="${esc(r.identity)}">Test block (5 min)</button><button data-act="test-restrict-clear" data-id="${esc(r.identity)}">Clear test block</button>${r.status==="suspended"?`<button class="reinstate" data-act="reinstate" data-id="${esc(r.identity)}">Reinstate</button>`:""}<button class="terminate" data-act="terminate" data-id="${esc(r.identity)}">Terminate &amp; Ban</button></div>`;
   return `<div class="cols">
     <div><h4>Identity</h4><div class="row mono">${esc(r.identity)}</div><div class="row">Apple: <span class="muted">${apple}</span></div><div class="row">Gross revenue: <span class="muted">${usd(r.grossRevenueUsd)}</span></div><div class="row">First seen: <span class="muted">${dt(r.firstSeenAt)}</span></div>${acts}</div>
     <div><h4>Plan history</h4>${hist}</div>
@@ -171,9 +171,14 @@ function detail(r,i){
   </div>`;
 }
 async function action(act,id){
+  if(act==="terminate-preview"){
+    try{const r=await api("/api/admin/terminate-preview",{identity:id}),b=r.impact||{};alert("Permanent ban preview only. Nothing was changed.\n\nIdentities:\n"+((b.identities||[]).join("\n")||"none")+"\n\nDevices:\n"+((b.devices||[]).join("\n")||"none")+"\n\nIPs:\n"+((b.ips||[]).join("\n")||"none"));setMsg("Preview complete. Nothing was changed.");}catch(e){setMsg(e.message,"err");}return;
+  }
+  if(act==="test-restrict"&&!confirm("Apply a reversible, identity-only test block for 5 minutes?\nThis will NOT ban devices, IPs, or Apple-linked accounts.\n\n"+id))return;
+  if(act==="test-restrict-clear"&&!confirm("Clear the temporary test block now?\n\n"+id))return;
   if(act==="terminate"&&!confirm("Permanently ban this account, its devices, IP(s), and linked Apple ID(s)?\nThis CANNOT be undone.\n\n"+id))return;
   if(act==="reinstate"&&!confirm("Reinstate and clear strikes?\n\n"+id))return;
-  try{ await api("/api/admin/"+act,{identity:id}); setMsg((act==="terminate"?"Terminated ":"Reinstated ")+id); await load(); }
+  try{const r=await api("/api/admin/"+act,{identity:id});if(act==="test-restrict")setMsg("Test block active until "+dt(r.expiresAt)+". Only this identity is affected.");else if(act==="test-restrict-clear")setMsg("Temporary test block cleared for "+id);else{setMsg((act==="terminate"?"Terminated ":"Reinstated ")+id);await load();}}
   catch(e){ setMsg(e.message,"err"); }
 }
 $("filter").addEventListener("input",()=>{ if(ROWS.length) renderTable(); });

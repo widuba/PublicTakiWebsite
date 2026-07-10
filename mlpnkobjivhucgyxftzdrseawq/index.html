@@ -70,6 +70,9 @@
         <div class="meta">Flagged messages retained for review:</div>
         ${viols || '<div class="meta">(none)</div>'}
         <div class="actions">
+          <button data-act="terminate-preview">Preview ban impact</button>
+          <button data-act="test-restrict">Test block (5 min)</button>
+          <button data-act="test-restrict-clear">Clear test block</button>
           <button class="reinstate" data-act="reinstate">Reinstate</button>
           <button class="terminate" data-act="terminate">Terminate &amp; Ban (permanent)</button>
         </div></div>`;
@@ -79,16 +82,30 @@
   queueEl.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-act]"); if (!btn) return;
     const card = btn.closest(".acct"); const id = card.getAttribute("data-id"); const act = btn.getAttribute("data-act");
+    if (act === "terminate-preview") {
+      try {
+        const r = await api("/api/admin/terminate-preview", { identity: id }); const b = r.impact || {};
+        alert("Permanent ban preview only. Nothing was changed.\n\nIdentities:\n" + ((b.identities || []).join("\n") || "none") + "\n\nDevices:\n" + ((b.devices || []).join("\n") || "none") + "\n\nIPs:\n" + ((b.ips || []).join("\n") || "none"));
+        setMsg("Preview complete. Nothing was changed.", "ok");
+      } catch (err) { setMsg(err.message, "err"); }
+      return;
+    }
+    if (act === "test-restrict" && !confirm("Apply a reversible, identity-only test block for 5 minutes?\n\nThis will NOT ban devices, IPs, or Apple-linked accounts.\n\n" + id)) return;
+    if (act === "test-restrict-clear" && !confirm("Clear the temporary test block now?\n\n" + id)) return;
     if (act === "terminate" && !confirm("Permanently ban this account, its devices, IP(s), and linked Apple ID(s)?\n\nThis CANNOT be undone.\n\n" + id)) return;
     if (act === "reinstate" && !confirm("Reinstate this account and clear its strikes?\n\n" + id)) return;
     btn.disabled = true; setMsg((act === "terminate" ? "Terminating " : "Reinstating ") + id + "…");
     try {
       const r = await api("/api/admin/" + act, { identity: id });
-      card.remove();
-      if (act === "terminate") {
+      if (act === "test-restrict") {
+        setMsg("Test block active until " + fmt(r.expiresAt) + ". It affects only " + id + ".", "ok");
+      } else if (act === "test-restrict-clear") {
+        setMsg("Temporary test block cleared for " + id + ".", "ok");
+      } else if (act === "terminate") {
+        card.remove();
         const b = r.banned || {};
         setMsg("Terminated. Banned " + (b.identities || []).length + " identity(ies), " + (b.devices || []).length + " device(s), " + (b.ips || []).length + " IP(s).", "ok");
-      } else setMsg("Reinstated " + id + ".", "ok");
+      } else { card.remove(); setMsg("Reinstated " + id + ".", "ok"); }
     } catch (err) { btn.disabled = false; setMsg(err.message, "err"); }
   });
 
