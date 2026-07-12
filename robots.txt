@@ -1,2 +1,4 @@
 User-agent: *
 Disallow:
+
+Sitemap: https://takiai.app/sitemap.xml
