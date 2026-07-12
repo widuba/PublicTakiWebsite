@@ -157,7 +157,9 @@ function showConfirmation() {
   $("confirmId").textContent = account.id;
   $("confirmPlan").textContent = labels[account.tier] || "Standard";
   $("confirmApple").textContent = account.appleSynced ? "Connected" : "Not connected";
-  $("confirmDevices").innerHTML = (account.devices.length ? account.devices : ["No device details reported yet"]).map((device) => `<span>${device}</span>`).join("");
+  $("confirmDevices").innerHTML = account.devices.length
+    ? account.devices.map((device) => `<span>${device}</span>`).join("")
+    : '<p class="device-sync-note">Open the updated Taki app on this device to sync its exact model.</p>';
   $("confirmLayer").classList.remove("hidden"); document.body.classList.add("modal-open");
 }
 function closeConfirmation() { $("confirmLayer").classList.add("hidden"); document.body.classList.remove("modal-open"); setMessage("confirmMsg", ""); }
