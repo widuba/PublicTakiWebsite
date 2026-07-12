@@ -58,7 +58,7 @@
   <div class="confirm-dialog">
     <span class="eyebrow">Account confirmation</span>
     <h2 id="confirmTitle">Is this the right account?</h2>
-    <div class="confirm-person"><div class="avatar" id="confirmInitial">T</div><div><strong id="confirmName">Taki user</strong><span id="confirmEmail"></span></div></div>
+    <div class="confirm-person"><div class="avatar" id="confirmInitial">T</div><div><strong id="confirmName">Account holder</strong><span id="confirmEmail"></span></div></div>
     <dl class="account-facts">
       <div><dt>Account ID</dt><dd id="confirmId">—</dd></div>
       <div><dt>Current plan</dt><dd id="confirmPlan">—</dd></div>
@@ -84,7 +84,7 @@ let products = {
   pro: { key: "pro", label: "Pro", creditsPerCycle: 15000, priceUsd: 29.99 }
 };
 let selectedProduct = "";
-let account = { id: "", tier: "free", isPro: false, appleSynced: false, email: "", displayName: "Taki user", devices: [] };
+let account = { id: "", tier: "free", isPro: false, appleSynced: false, email: "", displayName: "", devices: [] };
 
 function normalizeIdentity(value) { return String(value || "").replace(/\D/g, "").slice(0, 8); }
 function setMessage(id, text, kind) { $(id).textContent = text || ""; $(id).className = "msg" + (kind ? " " + kind : ""); }
@@ -143,7 +143,7 @@ $("next").onclick = async () => {
     const response = await fetch(API + "/api/credits/account-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity }) });
     const data = await response.json();
     if (!data.valid) { setMessage("msg1", data.reason || "We couldn't find that account.", "err"); $("next").disabled = false; return; }
-    account = { id: identity, tier: data.tier || "free", isPro: !!data.isPro, appleSynced: !!data.appleSynced, email: data.email || "", displayName: data.displayName || "Taki user", devices: Array.isArray(data.devices) ? data.devices : [] };
+    account = { id: identity, tier: data.tier || "free", isPro: !!data.isPro, appleSynced: !!data.appleSynced, email: data.email || "", displayName: data.displayName || `Account ${identity}`, devices: Array.isArray(data.devices) ? data.devices : [] };
     if (typeof data.min === "number") { MIN = data.min; MAX = data.max; }
     if (typeof data.centsPerCredit === "number") CENTS_PER_CREDIT = data.centsPerCredit;
     setMessage("msg1", ""); showConfirmation();
