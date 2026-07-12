@@ -3,195 +3,234 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Buy Credits — Taki AI Assistant</title>
+<title>Plans and Credits — Taki AI Assistant</title>
 <link rel="stylesheet" href="../styles.css" />
 </head>
 <body class="site-buy">
-<div class="wrap">
+<main class="wrap buy-flow">
   <span class="eyebrow">Taki AI Assistant</span>
-  <h1>Buy Credits</h1>
-  <p class="sub">Top up your balance instantly. Credits are added to your account and expire 90 days after purchase. A subscription is a much better value per credit — top-ups are for topping off.</p>
+  <h1>Choose what to add</h1>
+  <p class="sub">Select a monthly plan or add extra credits to an existing Taki account.</p>
+  <div id="banner" aria-live="polite"></div>
 
-  <div id="banner"></div>
-
-  <div class="steps">
-    <div class="s active" id="step1dot"><span class="dot">1</span> Account</div>
-    <div class="bar"></div>
-    <div class="s" id="step2dot"><span class="dot">2</span> Amount</div>
+  <div class="steps" aria-label="Purchase progress">
+    <div class="s active" id="step1dot"><span class="dot">1</span> Selection</div><div class="bar"></div>
+    <div class="s" id="step2dot"><span class="dot">2</span> Account</div><div class="bar"></div>
+    <div class="s" id="step3dot"><span class="dot">3</span> Payment</div>
   </div>
 
-  <!-- STEP 1 — verify account -->
-  <div id="stepAccount">
-    <label>Your Account ID
-      <span class="hint">Find this in the app under <b>Settings → Account ID</b> — it's an 8-digit number. Paste it here.</span>
+  <section id="stepProduct" class="buy-section">
+    <div class="purchase-grid" id="products" aria-label="Available purchases"></div>
+  </section>
+
+  <section id="stepAccount" class="buy-section hidden">
+    <div class="selection-summary" id="selectionSummary"></div>
+    <button class="link-btn" id="changeProduct" type="button">Change selection</button>
+    <label for="identity">Taki Account ID
+      <span class="hint">Find the eight-digit number under <b>Settings → Account ID</b> in the app.</span>
     </label>
-    <input id="identity" type="text" inputmode="numeric" maxlength="32" placeholder="e.g. 10234567" autocomplete="off" spellcheck="false" />
-    <button class="buy" id="next" disabled>Next</button>
-    <div class="msg" id="msg1"></div>
-  </div>
+    <input id="identity" type="text" inputmode="numeric" maxlength="8" placeholder="10234567" autocomplete="off" spellcheck="false" />
+    <button class="buy" id="next" type="button" disabled>Find account</button>
+    <div class="msg" id="msg1" aria-live="polite"></div>
+  </section>
 
-  <!-- STEP 2 — choose amount + pay -->
-  <div id="stepAmount" class="hidden">
+  <section id="stepAmount" class="buy-section hidden">
     <div class="acct">
-      <div>
-        <div class="id" id="acctId">—</div>
-        <div class="who" id="acctWho">Verified account</div>
-      </div>
+      <div><div class="id" id="acctId">—</div><div class="who" id="acctWho">Confirmed account</div></div>
       <span class="badge" id="acctBadge">—</span>
     </div>
-    <button class="link-btn" id="changeAcct">← Use a different account</button>
-
-    <label>Choose an amount</label>
+    <button class="link-btn" id="changeAcct" type="button">Use a different account</button>
+    <label>Choose a credit amount</label>
     <div class="packs" id="packs"></div>
-
-    <label>Or enter a custom amount
-      <span class="hint" id="rangeHint"></span>
-    </label>
+    <label for="custom">Or enter a custom amount<span class="hint" id="rangeHint"></span></label>
     <input id="custom" type="number" inputmode="numeric" placeholder="Number of credits" />
-
     <div class="total"><span id="rateLabel">Total</span><b id="total">—</b></div>
-    <button class="buy" id="buy" disabled>Continue to payment</button>
-    <div class="msg" id="msg2"></div>
-  </div>
+    <button class="buy" id="buyCredits" type="button" disabled>Continue to Stripe</button>
+    <div class="msg" id="msg2" aria-live="polite"></div>
+  </section>
 
-  <div class="foot">
-    Payments are processed securely by Stripe — we never see your card details. Purchases are final except where required by law.
-    <br />Questions? <a href="../support/">Contact support</a> · <a href="../">Back to Taki AI</a>
+  <p class="foot">Payments are processed securely by Stripe. Monthly plans renew automatically until canceled. Credits expire 90 days after they are granted.<br />
+    <a href="../support/">Contact support</a> · <a href="../">Back to Taki AI</a>
+  </p>
+</main>
+
+<div class="confirm-layer hidden" id="confirmLayer" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="confirm-dialog">
+    <span class="eyebrow">Account confirmation</span>
+    <h2 id="confirmTitle">Is this the right account?</h2>
+    <div class="confirm-person"><div class="avatar" id="confirmInitial">T</div><div><strong id="confirmName">Taki user</strong><span id="confirmEmail"></span></div></div>
+    <dl class="account-facts">
+      <div><dt>Account ID</dt><dd id="confirmId">—</dd></div>
+      <div><dt>Current plan</dt><dd id="confirmPlan">—</dd></div>
+      <div><dt>Apple sync</dt><dd id="confirmApple">—</dd></div>
+    </dl>
+    <div class="device-block"><strong>Known devices</strong><div class="device-list" id="confirmDevices"></div></div>
+    <p class="privacy-note">Email is partially hidden because an Account ID is not a password.</p>
+    <div class="confirm-actions"><button id="notMine" type="button">Not this account</button><button class="primary" id="confirmAccount" type="button">Confirm account</button></div>
+    <div class="msg" id="confirmMsg" aria-live="polite"></div>
   </div>
 </div>
 
 <script>
-  const API = "https://takiaiserver.onrender.com";
-  const $ = (id) => document.getElementById(id);
-  let MIN = 500, MAX = 500000, CENTS_PER_CREDIT = 1, selected = 0;
-  let account = { id: "", isPro: false, tier: "free" };
+const API = "https://takiaiserver.onrender.com";
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => Number(n).toLocaleString();
+const usd = (n) => "$" + Number(n).toFixed(2);
+const labels = { plus: "Plus", plus_voice: "Plus Voice", pro: "Pro", free: "Standard", credits: "Extra Credits" };
+let MIN = 500, MAX = 500000, CENTS_PER_CREDIT = 1, selectedCredits = 0;
+let products = {
+  plus: { key: "plus", label: "Plus", creditsPerCycle: 3000, priceUsd: 9.99 },
+  plus_voice: { key: "plus_voice", label: "Plus Voice", creditsPerCycle: 4000, priceUsd: 14.99 },
+  pro: { key: "pro", label: "Pro", creditsPerCycle: 15000, priceUsd: 29.99 }
+};
+let selectedProduct = "";
+let account = { id: "", tier: "free", isPro: false, appleSynced: false, email: "", displayName: "Taki user", devices: [] };
 
-  const fmt = (n)=>n.toLocaleString();
-  const usd = (n)=>"$"+n.toFixed(2);
-  // Mirror the server's pricing (server stays authoritative on the real charge).
-  function priceUsd(c){
-    if(!(c>=MIN && c<=MAX)) return null;
-    return (c * CENTS_PER_CREDIT) / 100;
-  }
-
-  function normalizeIdentity(v){
-    return String(v || "").replace(/\D/g,"").slice(0,8);
-  }
-
-  /* ---------- STEP 1: verify account ---------- */
-  $("identity").addEventListener("input", ()=>{
-    // digits only, enable Next at 8 digits
-    $("identity").value = normalizeIdentity($("identity").value);
-    $("next").disabled = $("identity").value.length !== 8;
-    setMsg1("");
+function normalizeIdentity(value) { return String(value || "").replace(/\D/g, "").slice(0, 8); }
+function setMessage(id, text, kind) { $(id).textContent = text || ""; $(id).className = "msg" + (kind ? " " + kind : ""); }
+function markStep(number) {
+  [1, 2, 3].forEach((n) => {
+    const el = $("step" + n + "dot");
+    el.classList.toggle("active", n === number);
+    el.classList.toggle("done", n < number);
+    el.querySelector(".dot").textContent = n < number ? "✓" : String(n);
   });
-  $("identity").addEventListener("keydown",(e)=>{ if(e.key==="Enter" && !$("next").disabled) $("next").click(); });
+}
+function productDescription(key) {
+  if (key === "plus") return "3,000 credits every month";
+  if (key === "plus_voice") return "4,000 credits with included voice";
+  if (key === "pro") return "15,000 credits, voice, and 20% off extra credits";
+  return "One-time credits added immediately";
+}
+function renderProducts() {
+  const entries = [products.plus, products.plus_voice, { key: "credits", label: "Extra Credits", priceUsd: 5 }, products.pro];
+  $("products").innerHTML = entries.map((item) => `
+    <button class="purchase-option" type="button" data-product="${item.key}">
+      <span class="option-name">${item.label}</span>
+      <span class="option-price">${item.key === "credits" ? "From $5" : usd(item.priceUsd) + '<small>/month</small>'}</span>
+      <span class="option-detail">${productDescription(item.key)}</span>
+      <span class="option-action">Select</span>
+    </button>`).join("");
+  document.querySelectorAll(".purchase-option").forEach((button) => button.onclick = () => chooseProduct(button.dataset.product));
+}
+function chooseProduct(key) {
+  selectedProduct = key;
+  $("stepProduct").classList.add("hidden");
+  $("stepAccount").classList.remove("hidden");
+  const item = key === "credits" ? null : products[key];
+  $("selectionSummary").innerHTML = `<strong>${labels[key]}</strong><span>${key === "credits" ? "Choose the amount after confirming an account" : usd(item.priceUsd) + " monthly · " + fmt(item.creditsPerCycle) + " credits"}</span>`;
+  markStep(2);
+  $("identity").focus();
+}
+function showProducts() {
+  selectedProduct = "";
+  $("stepAccount").classList.add("hidden"); $("stepAmount").classList.add("hidden"); $("stepProduct").classList.remove("hidden");
+  markStep(1); setMessage("msg1", "");
+}
 
-  $("next").onclick = async ()=>{
-    const identity = normalizeIdentity($("identity").value);
-    $("identity").value = identity;
-    $("next").disabled = true; setMsg1("Checking your account…");
-    try{
-      const r = await fetch(API+"/api/credits/account-check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity})});
-      const d = await r.json();
-      if(!d.valid){ setMsg1(d.reason || "That account can't buy credits.","err"); $("next").disabled=false; return; }
-      account = { id: identity, isPro: !!d.isPro, tier: d.tier || (d.isPro ? "pro" : "free") };
-      if(typeof d.min==="number"){ MIN=d.min; MAX=d.max; }
-      if(typeof d.centsPerCredit==="number"){ CENTS_PER_CREDIT=d.centsPerCredit; }
-      setMsg1("");
-      showAmountStep();
-    }catch(e){ setMsg1("Network error — please try again.","err"); $("next").disabled=false; }
-  };
+$("identity").addEventListener("input", () => {
+  $("identity").value = normalizeIdentity($("identity").value);
+  $("next").disabled = $("identity").value.length !== 8;
+  setMessage("msg1", "");
+});
+$("identity").addEventListener("keydown", (event) => { if (event.key === "Enter" && !$("next").disabled) $("next").click(); });
+$("changeProduct").onclick = showProducts;
 
-  /* ---------- STEP 2: amount + pay ---------- */
-  const PRESETS = [500,5000,25000];
-  function renderPacks(){
-    const presetUsd = (n)=>Math.abs(n-Math.round(n))<0.001 ? "$"+Math.round(n) : usd(n);
-    $("packs").innerHTML = PRESETS.map(c=>{
-      const p = priceUsd(c);
-      return `<div class="pack" data-c="${c}"><div class="c">${fmt(c)} credits</div><div class="p">${p!=null?presetUsd(p):"—"}</div></div>`;
-    }).join("");
-    $("packs").querySelectorAll(".pack").forEach(el=>el.onclick=()=>{ $("custom").value=""; select(+el.dataset.c); });
+$("next").onclick = async () => {
+  const identity = normalizeIdentity($("identity").value);
+  $("next").disabled = true; setMessage("msg1", "Checking your account…");
+  try {
+    const response = await fetch(API + "/api/credits/account-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity }) });
+    const data = await response.json();
+    if (!data.valid) { setMessage("msg1", data.reason || "We couldn't find that account.", "err"); $("next").disabled = false; return; }
+    account = { id: identity, tier: data.tier || "free", isPro: !!data.isPro, appleSynced: !!data.appleSynced, email: data.email || "", displayName: data.displayName || "Taki user", devices: Array.isArray(data.devices) ? data.devices : [] };
+    if (typeof data.min === "number") { MIN = data.min; MAX = data.max; }
+    if (typeof data.centsPerCredit === "number") CENTS_PER_CREDIT = data.centsPerCredit;
+    setMessage("msg1", ""); showConfirmation();
+  } catch { setMessage("msg1", "Network error. Please try again.", "err"); $("next").disabled = false; }
+};
+
+function showConfirmation() {
+  $("confirmName").textContent = account.displayName;
+  $("confirmInitial").textContent = account.displayName.trim().charAt(0).toUpperCase() || "T";
+  $("confirmEmail").textContent = account.email || (account.appleSynced ? "Apple email unavailable" : "Not synced with Apple");
+  $("confirmId").textContent = account.id;
+  $("confirmPlan").textContent = labels[account.tier] || "Standard";
+  $("confirmApple").textContent = account.appleSynced ? "Connected" : "Not connected";
+  $("confirmDevices").innerHTML = (account.devices.length ? account.devices : ["No device details reported yet"]).map((device) => `<span>${device}</span>`).join("");
+  $("confirmLayer").classList.remove("hidden"); document.body.classList.add("modal-open");
+}
+function closeConfirmation() { $("confirmLayer").classList.add("hidden"); document.body.classList.remove("modal-open"); setMessage("confirmMsg", ""); }
+$("notMine").onclick = () => { closeConfirmation(); $("identity").select(); $("next").disabled = false; };
+$("confirmAccount").onclick = async () => {
+  if (selectedProduct === "credits") { closeConfirmation(); showAmountStep(); return; }
+  $("confirmAccount").disabled = true; setMessage("confirmMsg", "Opening secure monthly checkout…");
+  try {
+    const response = await fetch(API + "/api/plans/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, tier: selectedProduct }) });
+    const data = await response.json();
+    if (data.url) { location.href = data.url; return; }
+    setMessage("confirmMsg", data.error || "Could not start checkout.", "err");
+  } catch { setMessage("confirmMsg", "Network error. Please try again.", "err"); }
+  $("confirmAccount").disabled = false;
+};
+
+const PRESETS = [500, 5000, 25000];
+function priceUsd(credits) { return credits >= MIN && credits <= MAX ? credits * CENTS_PER_CREDIT / 100 : null; }
+function renderPacks() {
+  $("packs").innerHTML = PRESETS.map((credits) => `<button class="pack" type="button" data-c="${credits}"><span class="c">${fmt(credits)} credits</span><span class="p">${usd(priceUsd(credits))}</span></button>`).join("");
+  document.querySelectorAll(".pack").forEach((button) => button.onclick = () => { $("custom").value = ""; selectCredits(Number(button.dataset.c)); });
+}
+function selectCredits(credits) {
+  selectedCredits = credits;
+  document.querySelectorAll(".pack").forEach((button) => button.classList.toggle("on", Number(button.dataset.c) === credits && !$("custom").value));
+  const price = priceUsd(credits); $("total").textContent = price == null ? "—" : usd(price); $("buyCredits").disabled = price == null;
+}
+$("custom").addEventListener("input", () => { document.querySelectorAll(".pack").forEach((button) => button.classList.remove("on")); selectCredits(Math.floor(Number($("custom").value))); });
+function showAmountStep() {
+  $("stepAccount").classList.add("hidden"); $("stepAmount").classList.remove("hidden"); markStep(3);
+  $("acctId").textContent = "Account " + account.id; $("acctWho").textContent = account.displayName;
+  $("acctBadge").textContent = labels[account.tier] || "Standard"; $("acctBadge").className = "badge" + (account.tier === "free" ? " free" : "");
+  $("rateLabel").textContent = `Total · ${CENTS_PER_CREDIT}¢ per credit`; $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
+  renderPacks(); selectCredits(PRESETS[0]);
+}
+$("changeAcct").onclick = () => { $("stepAmount").classList.add("hidden"); $("stepAccount").classList.remove("hidden"); markStep(2); $("next").disabled = false; };
+$("buyCredits").onclick = async () => {
+  if (priceUsd(selectedCredits) == null) return;
+  $("buyCredits").disabled = true; setMessage("msg2", "Opening secure checkout…");
+  try {
+    const response = await fetch(API + "/api/credits/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, credits: selectedCredits }) });
+    const data = await response.json(); if (data.url) { location.href = data.url; return; }
+    setMessage("msg2", data.error || "Could not start checkout.", "err");
+  } catch { setMessage("msg2", "Network error. Please try again.", "err"); }
+  $("buyCredits").disabled = false;
+};
+
+async function verifyActivation(accountId, expectedTier) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const response = await fetch(API + "/api/credits/account-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: accountId }) });
+      const data = await response.json();
+      if (data.valid && data.tier === expectedTier) { $("banner").innerHTML = `<div class="banner ok">${labels[expectedTier]} is active on account ${accountId}.</div>`; return; }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 1200));
   }
-  function select(c){
-    selected = c;
-    $("packs").querySelectorAll(".pack").forEach(el=>el.classList.toggle("on", +el.dataset.c===c && !$("custom").value));
-    const p = priceUsd(c);
-    $("total").textContent = p!=null ? usd(p) : "—";
-    $("buy").disabled = p==null;
-  }
-  $("custom").addEventListener("input", ()=>{
-    const c = Math.floor(+$("custom").value);
-    $("packs").querySelectorAll(".pack").forEach(el=>el.classList.remove("on"));
-    if(c) select(c); else select(0);
-  });
+  $("banner").innerHTML = '<div class="banner warn">Payment succeeded. Stripe is still confirming the plan; it should appear in the app shortly.</div>';
+}
 
-  function showAmountStep(){
-    $("stepAccount").classList.add("hidden");
-    $("stepAmount").classList.remove("hidden");
-    $("step1dot").classList.remove("active"); $("step1dot").classList.add("done"); $("step1dot").querySelector(".dot").textContent="✓";
-    $("step2dot").classList.add("active");
-    $("acctId").textContent = "Account "+account.id;
-    const rate = (CENTS_PER_CREDIT).toFixed(CENTS_PER_CREDIT % 1 ? 1 : 0);
-    if(account.tier === "pro"){
-      $("acctBadge").textContent = "Pro · 20% off"; $("acctBadge").className="badge";
-      $("acctWho").textContent = "Pro member — discounted credit pricing";
-    } else if(account.tier === "plus_voice"){
-      $("acctBadge").textContent = "Plus Voice"; $("acctBadge").className="badge";
-      $("acctWho").textContent = "Plus Voice member — standard credit pricing";
-    } else if(account.tier === "plus"){
-      $("acctBadge").textContent = "Plus"; $("acctBadge").className="badge";
-      $("acctWho").textContent = "Plus member — standard credit pricing";
-    } else {
-      $("acctBadge").textContent = "Standard"; $("acctBadge").className="badge free";
-      $("acctWho").textContent = "No active plan — standard credit pricing";
-    }
-    $("rateLabel").textContent = `Total · ${rate}¢ per credit`;
-    $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
-    renderPacks(); select(PRESETS[0]);
-  }
-
-  $("changeAcct").onclick = ()=>{
-    $("stepAmount").classList.add("hidden");
-    $("stepAccount").classList.remove("hidden");
-    $("step2dot").classList.remove("active");
-    $("step1dot").classList.remove("done"); $("step1dot").classList.add("active"); $("step1dot").querySelector(".dot").textContent="1";
-    $("next").disabled = $("identity").value.length !== 8;
-  };
-
-  $("buy").onclick = async ()=>{
-    const credits = selected;
-    if(!priceUsd(credits)) return;
-    $("buy").disabled = true; setMsg2("Starting secure checkout…");
-    try{
-      const r = await fetch(API+"/api/credits/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({identity:account.id,credits})});
-      const d = await r.json();
-      if(d.url){ window.location.href = d.url; return; }
-      setMsg2(d.error||"Could not start checkout.","err"); $("buy").disabled=false;
-    }catch(e){ setMsg2("Network error — please try again.","err"); $("buy").disabled=false; }
-  };
-
-  function setMsg1(t,k){ $("msg1").textContent=t||""; $("msg1").className="msg"+(k?" "+k:""); }
-  function setMsg2(t,k){ $("msg2").textContent=t||""; $("msg2").className="msg"+(k?" "+k:""); }
-
-  // Status banner after returning from Stripe.
-  const status = new URLSearchParams(location.search).get("status");
-  if(status==="success") $("banner").innerHTML = '<div class="banner ok">✅ Payment received! Your credits have been added — reopen the app to see your new balance.</div>';
-  else if(status==="canceled") $("banner").innerHTML = '<div class="banner warn">Checkout canceled — no charge was made.</div>';
-
-  // Load config (min/max + whether top-ups are live).
-  (async ()=>{
-    try{
-      const c = await (await fetch(API+"/api/credits/topup-config")).json();
-      if(c && typeof c.min==="number"){ MIN=c.min; MAX=c.max; }
-      if(c && typeof c.centsPerCredit==="number"){ CENTS_PER_CREDIT=c.centsPerCredit; }
-      if(c && c.enabled===false){
-        $("stepAccount").classList.add("hidden");
-        document.querySelector(".steps").classList.add("hidden");
-        $("banner").innerHTML = '<div class="banner warn">Credit top-ups aren’t available just yet — check back soon.</div>';
-      }
-    }catch(e){ /* keep defaults */ }
-  })();
+renderProducts();
+(async function init() {
+  try {
+    const config = await (await fetch(API + "/api/credits/topup-config")).json();
+    if (typeof config.min === "number") { MIN = config.min; MAX = config.max; CENTS_PER_CREDIT = config.centsPerCredit; }
+    if (Array.isArray(config.plans)) for (const plan of config.plans) products[plan.key] = plan;
+    if (config.enabled === false) $("banner").innerHTML = '<div class="banner warn">Online purchases are temporarily unavailable.</div>';
+  } catch {}
+  renderProducts();
+  const params = new URLSearchParams(location.search), status = params.get("status"), accountId = normalizeIdentity(params.get("account")), plan = params.get("plan");
+  if (status === "plan-success" && accountId && products[plan]) { $("banner").innerHTML = '<div class="banner ok">Payment received. Activating your plan…</div>'; verifyActivation(accountId, plan); }
+  else if (status === "success") $("banner").innerHTML = '<div class="banner ok">Payment received. Your credits have been added to the confirmed account.</div>';
+  else if (status === "canceled") $("banner").innerHTML = '<div class="banner warn">Checkout canceled. No charge was made.</div>';
+})();
 </script>
 </body>
 </html>
