@@ -11,8 +11,7 @@
 <main class="wrap buy-flow">
   <span class="eyebrow">Taki AI Assistant</span>
   <h1>Choose what to add</h1>
-  <p class="sub">Select a monthly plan or add one-time extra credits to an existing Taki account.</p>
-  <p class="credit-explainer">One credit represents $0.001 of measured AI and provider usage. Simpler requests use fewer credits than complex or live requests.</p>
+  <p class="sub">Select a monthly plan or add extra credits to an existing Taki account.</p>
   <div id="banner" aria-live="polite"></div>
 
   <div class="steps" aria-label="Purchase progress">
@@ -219,7 +218,7 @@ function showAmountStep() {
   $("stepAccount").classList.add("hidden"); $("stepAmount").classList.remove("hidden"); markStep(3);
   $("acctId").textContent = "Account " + account.id; $("acctWho").textContent = account.displayName;
   $("acctBadge").textContent = labels[account.tier] || "Standard"; $("acctBadge").className = "badge" + (account.tier === "free" ? " free" : "");
-  $("rateLabel").textContent = `Total · ${CENTS_PER_CREDIT}¢ per credit`; $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
+  $("rateLabel").textContent = "Total"; $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
   renderPacks(); selectCredits(PRESETS[0]);
 }
 $("changeAcct").onclick = () => { $("stepAmount").classList.add("hidden"); $("stepAccount").classList.remove("hidden"); markStep(2); $("next").disabled = false; };
