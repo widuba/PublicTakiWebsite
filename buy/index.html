@@ -10,7 +10,8 @@
 <main class="wrap buy-flow">
   <span class="eyebrow">Taki AI Assistant</span>
   <h1>Choose what to add</h1>
-  <p class="sub">Select a monthly plan or add extra credits to an existing Taki account.</p>
+  <p class="sub">Select a monthly plan or add one-time extra credits to an existing Taki account.</p>
+  <p class="credit-explainer">One credit represents $0.001 of measured AI and provider usage. Simpler requests use fewer credits than complex or live requests.</p>
   <div id="banner" aria-live="polite"></div>
 
   <div class="steps" aria-label="Purchase progress">
@@ -79,9 +80,9 @@ const usd = (n) => "$" + Number(n).toFixed(2);
 const labels = { plus: "Plus", plus_voice: "Plus Voice", pro: "Pro", free: "Standard", credits: "Extra Credits" };
 let MIN = 500, MAX = 500000, CENTS_PER_CREDIT = 1, selectedCredits = 0;
 let products = {
-  plus: { key: "plus", label: "Plus", creditsPerCycle: 3000, priceUsd: 9.99 },
-  plus_voice: { key: "plus_voice", label: "Plus Voice", creditsPerCycle: 4000, priceUsd: 14.99 },
-  pro: { key: "pro", label: "Pro", creditsPerCycle: 15000, priceUsd: 29.99 }
+  plus: { key: "plus", label: "Plus", creditsPerCycle: 3000, priceUsd: 9.99, includedVoiceTurns: 0 },
+  plus_voice: { key: "plus_voice", label: "Plus Voice", creditsPerCycle: 4000, priceUsd: 14.99, includedVoiceTurns: 400 },
+  pro: { key: "pro", label: "Pro", creditsPerCycle: 15000, priceUsd: 29.99, includedVoiceTurns: 500 }
 };
 let selectedProduct = "";
 let account = { id: "", tier: "free", isPro: false, appleSynced: false, email: "", displayName: "", devices: [] };
@@ -97,10 +98,11 @@ function markStep(number) {
   });
 }
 function productDescription(key) {
-  if (key === "plus") return "3,000 credits every month";
-  if (key === "plus_voice") return "4,000 credits with included voice";
-  if (key === "pro") return "15,000 credits, voice, and 20% off extra credits";
-  return "One-time credits added immediately";
+  const plan = products[key];
+  if (key === "plus") return `${fmt(plan.creditsPerCycle)} monthly credits; voice uses credits`;
+  if (key === "plus_voice") return `${fmt(plan.creditsPerCycle)} monthly credits + ${fmt(plan.includedVoiceTurns)} included voice turns`;
+  if (key === "pro") return `${fmt(plan.creditsPerCycle)} monthly credits + ${fmt(plan.includedVoiceTurns)} included voice turns + 20% off extras`;
+  return "One-time credits added immediately; expires after 90 days";
 }
 function renderProducts() {
   const entries = [products.plus, products.plus_voice, { key: "credits", label: "Extra Credits", priceUsd: 5 }, products.pro];
@@ -118,7 +120,7 @@ function chooseProduct(key) {
   $("stepProduct").classList.add("hidden");
   $("stepAccount").classList.remove("hidden");
   const item = key === "credits" ? null : products[key];
-  $("selectionSummary").innerHTML = `<strong>${labels[key]}</strong><span>${key === "credits" ? "Choose the amount after confirming an account" : usd(item.priceUsd) + " monthly · " + fmt(item.creditsPerCycle) + " credits"}</span>`;
+  $("selectionSummary").innerHTML = `<strong>${labels[key]}</strong><span>${key === "credits" ? "Choose the amount after confirming an account" : usd(item.priceUsd) + " monthly · " + productDescription(key)}</span>`;
   markStep(2);
   $("identity").focus();
 }
@@ -224,7 +226,7 @@ renderProducts();
   try {
     const config = await (await fetch(API + "/api/credits/topup-config")).json();
     if (typeof config.min === "number") { MIN = config.min; MAX = config.max; CENTS_PER_CREDIT = config.centsPerCredit; }
-    if (Array.isArray(config.plans)) for (const plan of config.plans) products[plan.key] = plan;
+    if (Array.isArray(config.plans)) for (const plan of config.plans) products[plan.key] = { ...products[plan.key], ...plan };
     if (config.enabled === false) $("banner").innerHTML = '<div class="banner warn">Online purchases are temporarily unavailable.</div>';
   } catch {}
   renderProducts();
