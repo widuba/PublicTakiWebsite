@@ -602,7 +602,7 @@ footer a {
 
 /* Purchase flow */
 .buy-flow {
-  width: min(calc(100% - 40px), 820px);
+  width: min(calc(100% - 40px), 1120px);
   padding: 46px 0 56px;
 }
 
@@ -667,13 +667,13 @@ footer a {
 
 .purchase-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
 button.purchase-option {
   display: flex;
-  min-height: 164px;
+  min-height: 208px;
   flex-direction: column;
   align-items: flex-start;
   border: 1px solid var(--line);
@@ -1123,6 +1123,10 @@ details p {
 }
 
 @media (max-width: 860px) {
+  .purchase-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
