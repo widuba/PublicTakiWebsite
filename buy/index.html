@@ -109,16 +109,16 @@ function markStep(number) {
 function productDescription(key) {
   const plan = products[key];
   if (key === "plus") return `${fmt(plan.creditsPerCycle)} monthly credits; voice uses credits`;
-  if (key === "plus_voice") return `${fmt(plan.creditsPerCycle)} monthly credits + ${fmt(plan.includedVoiceTurns)} included voice turns`;
-  if (key === "pro") return `${fmt(plan.creditsPerCycle)} monthly credits + ${fmt(plan.includedVoiceTurns)} included voice turns + 20% off extras`;
+  if (key === "plus_voice") return `${fmt(plan.creditsPerCycle)} monthly credits + speech included for ${fmt(plan.includedVoiceTurns)} voice turns`;
+  if (key === "pro") return `${fmt(plan.creditsPerCycle)} monthly credits + speech included for ${fmt(plan.includedVoiceTurns)} voice turns + 20% off extras`;
   return "One-time credits added immediately; expires after 90 days";
 }
 function renderProducts() {
-  const entries = [products.plus, products.plus_voice, products.pro, { key: "credits", label: "Extra Credits", priceUsd: 5 }];
+  const entries = [products.plus, products.plus_voice, products.pro, { key: "credits", label: "Extra Credits", priceUsd: 4 }];
   $("products").innerHTML = entries.map((item) => `
     <button class="purchase-option" type="button" data-product="${item.key}">
       <span class="option-name">${item.label}</span>
-      <span class="option-price">${item.key === "credits" ? "From $5" : usd(item.priceUsd) + '<small>/month</small>'}</span>
+      <span class="option-price">${item.key === "credits" ? "From $4" : usd(item.priceUsd) + '<small>/month</small>'}</span>
       <span class="option-detail">${productDescription(item.key)}</span>
       <span class="option-action">Select</span>
     </button>`).join("");
