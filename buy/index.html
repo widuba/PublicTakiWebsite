@@ -90,11 +90,12 @@ const labels = { plus: "Plus", plus_voice: "Plus Voice", pro: "Pro", free: "Stan
 let MIN = 500, MAX = 500000, CENTS_PER_CREDIT = 1, selectedCredits = 0;
 let products = {
   plus: { key: "plus", label: "Plus", creditsPerCycle: 3000, priceUsd: 9.99, includedVoiceTurns: 0 },
-  plus_voice: { key: "plus_voice", label: "Plus Voice", creditsPerCycle: 4000, priceUsd: 14.99, includedVoiceTurns: 300 },
+  plus_voice: { key: "plus_voice", label: "Plus Voice", creditsPerCycle: 4000, priceUsd: 14.99, includedVoiceTurns: 150 },
   pro: { key: "pro", label: "Pro", creditsPerCycle: 15000, priceUsd: 29.99, includedVoiceTurns: 300 }
 };
 let selectedProduct = "";
 let account = { id: "", tier: "free", isPro: false, appleSynced: false, email: "", displayName: "", devices: [] };
+let handoffToken = "";
 
 function normalizeIdentity(value) { return String(value || "").replace(/\D/g, "").slice(0, 8); }
 function setMessage(id, text, kind) { $(id).textContent = text || ""; $(id).className = "msg" + (kind ? " " + kind : ""); }
@@ -109,16 +110,16 @@ function markStep(number) {
 function productDescription(key) {
   const plan = products[key];
   if (key === "plus") return `${fmt(plan.creditsPerCycle)} monthly credits; voice uses credits`;
-  if (key === "plus_voice") return `${fmt(plan.creditsPerCycle)} monthly credits + speech included for ${fmt(plan.includedVoiceTurns)} voice turns`;
-  if (key === "pro") return `${fmt(plan.creditsPerCycle)} monthly credits + speech included for ${fmt(plan.includedVoiceTurns)} voice turns + 20% off extras`;
+  if (key === "plus_voice") return `${fmt(plan.creditsPerCycle)} monthly credits + ${fmt(plan.includedVoiceTurns)} included voice turns + 20% off extras`;
+  if (key === "pro") return `${fmt(plan.creditsPerCycle)} monthly credits + ${fmt(plan.includedVoiceTurns)} included voice turns + 40% off extras`;
   return "One-time credits added immediately; expires after 90 days";
 }
 function renderProducts() {
-  const entries = [products.plus, products.plus_voice, products.pro, { key: "credits", label: "Extra Credits", priceUsd: 4 }];
+  const entries = [products.plus, products.plus_voice, products.pro, { key: "credits", label: "Extra Credits", priceUsd: 3 }];
   $("products").innerHTML = entries.map((item) => `
     <button class="purchase-option" type="button" data-product="${item.key}">
       <span class="option-name">${item.label}</span>
-      <span class="option-price">${item.key === "credits" ? "From $4" : usd(item.priceUsd) + '<small>/month</small>'}</span>
+      <span class="option-price">${item.key === "credits" ? "From $3" : usd(item.priceUsd) + '<small>/month</small>'}</span>
       <span class="option-detail">${productDescription(item.key)}</span>
       <span class="option-action">Select</span>
     </button>`).join("");
@@ -224,7 +225,7 @@ function selectCredits(credits) {
 $("custom").addEventListener("input", () => { document.querySelectorAll(".pack").forEach((button) => button.classList.remove("on")); selectCredits(Math.floor(Number($("custom").value))); });
 function showAmountStep() {
   $("stepAccount").classList.add("hidden"); $("stepAmount").classList.remove("hidden"); markStep(3);
-  $("acctId").textContent = "Account " + account.id; $("acctWho").textContent = account.displayName;
+  $("acctId").textContent = handoffToken ? "Connected Taki account" : "Account " + account.id; $("acctWho").textContent = account.displayName;
   $("acctBadge").textContent = labels[account.tier] || "Standard"; $("acctBadge").className = "badge" + (account.tier === "free" ? " free" : "");
   $("rateLabel").textContent = "Total"; $("rangeHint").textContent = `Between ${fmt(MIN)} and ${fmt(MAX)} credits.`;
   renderPacks(); selectCredits(PRESETS[0]);
@@ -234,7 +235,7 @@ $("buyCredits").onclick = async () => {
   if (priceUsd(selectedCredits) == null) return;
   $("buyCredits").disabled = true; setMessage("msg2", "Opening secure checkout…");
   try {
-    const response = await fetch(API + "/api/credits/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, credits: selectedCredits }) });
+    const response = await fetch(API + "/api/credits/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, credits: selectedCredits, handoffToken }) });
     const data = await response.json(); if (data.url) { location.href = data.url; return; }
     setMessage("msg2", data.error || "Could not start checkout.", "err");
   } catch { setMessage("msg2", "Network error. Please try again.", "err"); }
@@ -263,6 +264,34 @@ renderProducts();
   } catch {}
   renderProducts();
   const params = new URLSearchParams(location.search), status = params.get("status"), accountId = normalizeIdentity(params.get("account")), plan = params.get("plan");
+  handoffToken = params.get("handoff") || sessionStorage.getItem("takiPurchaseHandoff") || "";
+  if (handoffToken) {
+    try {
+      const response = await fetch(API + "/api/credits/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: handoffToken }) });
+      const data = await response.json();
+      if (!response.ok || !data.valid) throw new Error(data.reason || "This purchase link is no longer valid.");
+      sessionStorage.setItem("takiPurchaseHandoff", handoffToken);
+      const cleanURL = new URL(location.href);
+      cleanURL.searchParams.delete("handoff");
+      history.replaceState(null, "", cleanURL);
+      account = { id: data.identity, tier: data.tier || "free", isPro: !!data.isPro, appleSynced: !!data.appleSynced, email: data.email || "", displayName: data.displayName || "Taki account", devices: Array.isArray(data.devices) ? data.devices : [] };
+      if (typeof data.min === "number") { MIN = data.min; MAX = data.max; CENTS_PER_CREDIT = data.centsPerCredit; }
+      selectedProduct = "credits";
+      $("stepProduct").classList.add("hidden");
+      $("stepAccount").classList.add("hidden");
+      $("changeAcct").classList.add("hidden");
+      showAmountStep();
+      return;
+    } catch (error) {
+      sessionStorage.removeItem("takiPurchaseHandoff");
+      handoffToken = "";
+      const message = error instanceof Error ? error.message : "This purchase link is no longer valid.";
+      const warning = document.createElement("div");
+      warning.className = "banner warn";
+      warning.textContent = message;
+      $("banner").replaceChildren(warning);
+    }
+  }
   if (status === "plan-success" && accountId && products[plan]) { $("banner").innerHTML = '<div class="banner ok">Payment received. Activating your plan…</div>'; verifyActivation(accountId, plan); }
   else if (status === "success") $("banner").innerHTML = '<div class="banner ok">Payment received. Your credits have been added to the confirmed account.</div>';
   else if (status === "canceled") $("banner").innerHTML = '<div class="banner warn">Checkout canceled. No charge was made.</div>';
