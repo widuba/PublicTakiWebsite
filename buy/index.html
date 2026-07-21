@@ -236,7 +236,12 @@ $("buyCredits").onclick = async () => {
   $("buyCredits").disabled = true; setMessage("msg2", "Opening secure checkout…");
   try {
     const response = await fetch(API + "/api/credits/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, credits: selectedCredits, handoffToken }) });
-    const data = await response.json(); if (data.url) { location.href = data.url; return; }
+    const data = await response.json();
+    if (data.url) {
+      sessionStorage.removeItem("takiPurchaseHandoff");
+      location.href = data.url;
+      return;
+    }
     setMessage("msg2", data.error || "Could not start checkout.", "err");
   } catch { setMessage("msg2", "Network error. Please try again.", "err"); }
   $("buyCredits").disabled = false;
@@ -264,7 +269,8 @@ renderProducts();
   } catch {}
   renderProducts();
   const params = new URLSearchParams(location.search), status = params.get("status"), accountId = normalizeIdentity(params.get("account")), plan = params.get("plan");
-  handoffToken = params.get("handoff") || sessionStorage.getItem("takiPurchaseHandoff") || "";
+  if (status) sessionStorage.removeItem("takiPurchaseHandoff");
+  handoffToken = status ? "" : params.get("handoff") || sessionStorage.getItem("takiPurchaseHandoff") || "";
   if (handoffToken) {
     try {
       const response = await fetch(API + "/api/credits/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: handoffToken }) });
