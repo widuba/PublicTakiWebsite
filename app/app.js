@@ -5,7 +5,7 @@
   "use strict";
 
   var API_BASE = "https://takiaiserver.onrender.com";
-  var LS_DEVICE = "taki-web-device-id";
+  var LS_AUTH = "taki-web-auth-v1";
   var LS_EPOCH = "taki-web-reset-epoch";
   var LS_CHATS = "taki-web-chats-v1";
   var LS_ACTIVE = "taki-web-active-chat";
@@ -13,7 +13,10 @@
   // ---- State ----
   var chats = load(LS_CHATS, []);
   var activeId = localStorage.getItem(LS_ACTIVE) || "";
-  var deviceId = localStorage.getItem(LS_DEVICE) || "";
+  // Chatting requires a verified Apple/Google account: { identity, email, name }.
+  // The identity is the server-verified stable account id — free monthly credits
+  // attach to it, so clearing this storage just means signing in again.
+  var auth = load(LS_AUTH, null);
   var sending = false;
 
   // ---- Elements ----
@@ -21,6 +24,7 @@
   var app = $("app"), main = $("main"), messagesEl = $("messages"), scrollEl = $("scroll");
   var input = $("input"), sendBtn = $("sendBtn"), composer = $("composer");
   var historyEl = $("history"), footMeta = $("footMeta"), topbarTitle = $("topbarTitle");
+  var gate = $("gate"), gateError = $("gateError"), accountEl = $("account"), accountEmail = $("accountEmail");
 
   // ================= Networking =================
 
@@ -44,27 +48,104 @@
       .catch(function () { /* offline — the chat call will surface it */ });
   }
 
-  // A browser visitor gets an anonymous, credit-metered device identity.
-  function ensureDevice() {
-    if (deviceId) return Promise.resolve(deviceId);
-    var region = "";
-    try { region = (navigator.language.split("-")[1] || "").toUpperCase(); } catch (e) {}
-    return apiFetch("/api/register-device", { method: "POST", body: JSON.stringify({ region: region }) })
-      .then(function (r) { return r.json().catch(function () { return {}; }); })
-      .then(function (d) {
-        if (d && /^\d{8}$/.test(d.deviceId || "")) {
-          deviceId = d.deviceId;
-          localStorage.setItem(LS_DEVICE, deviceId);
-          if (d.credits) renderCredits(d.credits);
+  // ================= Sign-in (required to chat) =================
+
+  function setAuth(next) {
+    auth = next;
+    if (next) save(LS_AUTH, next);
+    else { try { localStorage.removeItem(LS_AUTH); } catch (e) {} }
+    renderAuth();
+  }
+
+  function renderAuth() {
+    gate.hidden = Boolean(auth);
+    accountEl.hidden = !auth;
+    if (auth) accountEmail.textContent = auth.email || auth.name || "Signed in";
+    updateSendState();
+  }
+
+  function showGateError(message) {
+    gateError.textContent = message;
+    gateError.hidden = false;
+  }
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src; s.async = true;
+      s.onload = resolve; s.onerror = function () { reject(new Error("failed " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function completeSignIn(path, idToken, button) {
+    gateError.hidden = true;
+    return apiFetch(path, { method: "POST", body: JSON.stringify({ idToken: idToken }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.data.identity) {
+          showGateError(res.data.error || "Sign-in didn't go through. Please try again.");
+          return;
         }
-        return deviceId;
+        setAuth({ identity: res.data.identity, email: res.data.email || "", name: res.data.name || "" });
+        if (res.data.credits) renderCredits(res.data.credits);
+        input.focus();
       })
-      .catch(function () { return ""; });
+      .catch(function () { showGateError("Couldn't reach Taki to verify the sign-in. Check your connection."); });
+  }
+
+  // Providers come from the server (client ids are public; config lives in env).
+  function initSignIn() {
+    apiFetch("/api/web/auth/config").then(function (r) { return r.ok ? r.json() : null; }).then(function (cfg) {
+      if (!cfg || (!cfg.google && !cfg.apple)) {
+        showGateError("Sign-in isn't available yet. Please try again later.");
+        return;
+      }
+      if (cfg.google) {
+        loadScript("https://accounts.google.com/gsi/client").then(function () {
+          var mount = $("googleSignIn");
+          mount.hidden = false;
+          window.google.accounts.id.initialize({
+            client_id: cfg.google.clientId,
+            callback: function (resp) { completeSignIn("/api/web/auth/google", resp.credential); }
+          });
+          window.google.accounts.id.renderButton(mount, {
+            theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "filled_black" : "outline",
+            size: "large", shape: "pill", text: "continue_with", width: 300
+          });
+        }).catch(function () { /* Google SDK unreachable — Apple may still work */ });
+      }
+      if (cfg.apple) {
+        loadScript("https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js").then(function () {
+          var btn = $("appleSignIn");
+          btn.hidden = false;
+          window.AppleID.auth.init({
+            clientId: cfg.apple.servicesId,
+            scope: "name email",
+            redirectURI: window.location.origin + "/app/",
+            usePopup: true
+          });
+          btn.addEventListener("click", function () {
+            window.AppleID.auth.signIn().then(function (resp) {
+              var token = resp && resp.authorization && resp.authorization.id_token;
+              if (token) completeSignIn("/api/web/auth/apple", token);
+              else showGateError("Apple didn't return a sign-in token. Please try again.");
+            }).catch(function () { /* user closed the popup */ });
+          });
+        }).catch(function () { /* Apple SDK unreachable */ });
+      }
+    }).catch(function () { showGateError("Couldn't load sign-in options. Check your connection and refresh."); });
+  }
+
+  function signOut() {
+    setAuth(null);
+    footMeta.textContent = "";
+    initSignIn();
   }
 
   function refreshCredits() {
-    if (!deviceId) return;
-    apiFetch("/api/credits?deviceId=" + encodeURIComponent(deviceId))
+    if (!auth) return;
+    apiFetch("/api/credits?deviceId=" + encodeURIComponent(auth.identity))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (c) { if (c) renderCredits(c); })
       .catch(function () {});
@@ -82,7 +163,7 @@
       message: text,
       context: context,
       timeZone: tz,
-      deviceId: deviceId,
+      deviceId: auth ? auth.identity : "",
       // A light default persona so replies read naturally; the app owns real personalization.
       profile: { personality: "friendly", personaIntensity: 5, responseLength: "balanced", emoji: "some" },
       voiceMode: false
@@ -229,18 +310,20 @@
 
   function renderCredits(c) {
     if (!c || typeof c.balance !== "number") return;
-    footMeta.textContent = c.balance.toLocaleString() + " credits · free plan";
+    var plan = c.tier === "pro" ? "Pro" : c.tier === "plus_voice" ? "Plus Voice" : c.tier === "plus" ? "Plus" : "free · 250/month";
+    footMeta.textContent = c.balance.toLocaleString() + " credits · " + plan;
   }
 
   function scrollToBottom() { scrollEl.scrollTop = scrollEl.scrollHeight; }
 
   // ================= Sending =================
 
-  function updateSendState() { sendBtn.disabled = sending || !input.value.trim(); }
+  function updateSendState() { sendBtn.disabled = sending || !auth || !input.value.trim(); }
 
   function submit() {
     var text = input.value.trim();
     if (!text || sending) return;
+    if (!auth) { gate.hidden = false; return; }
 
     var chat = activeChat();
     if (!chat) {
@@ -272,7 +355,14 @@
     var data = res.data || {};
     pending.pending = false;
 
-    if (res.status === 428 || data.code === "reset_required") {
+    if (res.status === 401) {
+      // The server no longer recognizes this account (e.g. a full reset).
+      // Re-verifying with the provider restores it — same identity, same credits.
+      pending.error = true;
+      pending.content = "Please sign in again to keep chatting.";
+      setAuth(null);
+      initSignIn();
+    } else if (res.status === 428 || data.code === "reset_required") {
       // Server was reset — adopt the new generation and ask the user to retry.
       if (data.resetEpoch) localStorage.setItem(LS_EPOCH, String(data.resetEpoch));
       pending.error = true;
@@ -380,9 +470,15 @@
     chip.addEventListener("click", function () { input.value = chip.textContent; autoGrow(); updateSendState(); submit(); });
   });
 
+  $("signOut").addEventListener("click", signOut);
+
   // ================= Boot =================
 
   render();
-  syncResetEpoch().then(function () { return ensureDevice(); }).then(function () { refreshCredits(); });
-  input.focus();
+  renderAuth();
+  syncResetEpoch().then(function () {
+    if (auth) refreshCredits();
+    else initSignIn();
+  });
+  if (auth) input.focus();
 })();

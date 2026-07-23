@@ -39,6 +39,8 @@
 }
 
 * { box-sizing: border-box; }
+/* Authored display values (flex etc.) must never override the hidden attribute. */
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   font-family: var(--font);
@@ -108,7 +110,48 @@ a { color: inherit; }
   transition: background 0.15s ease;
 }
 .get-app:hover { background: var(--hover); }
-.foot-meta { color: var(--faint); font-size: 12px; padding: 2px 12px 4px; min-height: 16px; }
+.foot-meta { color: var(--faint); font-size: 12px; min-height: 16px; }
+
+.account { display: flex; align-items: center; gap: 8px; padding: 6px 12px 4px; }
+.account-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.account-email { font-size: 12.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sign-out {
+  border: none; background: transparent; color: var(--faint); font-size: 12px;
+  cursor: pointer; padding: 4px 6px; border-radius: 7px; flex-shrink: 0;
+}
+.sign-out:hover { background: var(--hover); color: var(--text); }
+
+/* ---------- Sign-in gate ---------- */
+.gate {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); padding: 20px;
+}
+.gate-card { max-width: 380px; width: 100%; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.gate-mark {
+  width: 58px; height: 58px; border-radius: 50%; margin-bottom: 20px;
+  background: radial-gradient(circle at 34% 30%, #a898ff, var(--accent) 60%, #4b34c0);
+  box-shadow: 0 10px 30px -10px var(--accent);
+}
+.gate-title { margin: 0 0 10px; font-size: 24px; font-weight: 650; letter-spacing: -0.01em; }
+.gate-text { margin: 0 0 22px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.gate-buttons { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; align-items: stretch; }
+.gate-btn {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  padding: 11px 16px; border-radius: 999px; font-size: 15px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: var(--field); color: var(--text);
+  transition: background 0.15s ease;
+}
+.gate-btn:hover { background: var(--hover); }
+.gate-apple { background: #000; color: #fff; border-color: #000; }
+.gate-apple:hover { background: #1a1a1a; }
+@media (prefers-color-scheme: dark) {
+  .gate-apple { background: #fff; color: #000; border-color: #fff; }
+  .gate-apple:hover { background: #e8e8e8; }
+}
+.gate-google { display: flex; justify-content: center; min-height: 40px; }
+.gate-note { margin: 20px 0 0; color: var(--faint); font-size: 12.5px; }
+.gate-error { margin: 12px 0 0; color: #d9534f; font-size: 13.5px; }
 
 /* ---------- Main ---------- */
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
