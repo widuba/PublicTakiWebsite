@@ -6,7 +6,7 @@
 <title>Taki AI - your everyday iPhone assistant</title>
 <meta name="description" content="Taki is an AI assistant for iPhone that answers questions and completes real actions by text or voice." />
 <link rel="icon" type="image/png" href="assets/taki-icon.png" />
-<link rel="stylesheet" href="public.css?v=20260721-app" />
+<link rel="stylesheet" href="public.css?v=20260813" />
 </head>
 <body class="site-home">
 <div class="hero-shell">
@@ -16,7 +16,6 @@
       <nav aria-label="Main navigation">
         <a href="#capabilities">Capabilities</a>
         <a href="#pricing">Pricing</a>
-        <a href="app/">Web app</a>
         <a href="support/">Support</a>
       </nav>
     </header>
@@ -32,9 +31,9 @@
         <p class="lede">Messages, calendars, reminders, health questions, directions, live tracking, attachments, and hands-free voice. No special commands to learn.</p>
         <div class="hero-actions">
           <a class="cta" href="https://apps.apple.com/app/id6786835731">Get Taki</a>
-          <a class="secondary-cta" href="app/">Open Taki on the web</a>
+          <a class="secondary-cta" href="#pricing">View plans</a>
         </div>
-        <span class="cta-sub">500 free credits every month. Use Taki right in your browser, or get the iPhone app for voice and real device actions.</span>
+        <span class="cta-sub">500 free credits every month. Get the iPhone app for voice and real device actions.</span>
       </div>
       <div class="hero-scene" aria-hidden="true">
         <div class="scene-topline"><span>Taki AI</span><span>+</span></div>
@@ -100,22 +99,22 @@
     <div class="plans">
       <article class="plan" data-plan="plus">
         <div class="plan-kicker" aria-hidden="true"></div>
-        <div class="name">Plus</div><div class="price">$9.99<span>/month</span></div><div class="cr">3,000 credits</div>
-        <ul><li>Full text chat and iPhone actions</li><li>Voice available using credits</li><li>Credits reset with each billing cycle</li></ul>
+        <div class="name">Plus</div><div class="price"><span class="amount">$9.99</span><span>/month</span></div><div class="cr">4,000 AI Credits · 50 Voice Credits</div>
+        <ul><li>Best for mostly text usage</li><li>Full text chat, voice, and iPhone actions</li><li>Credits refresh each billing cycle</li></ul>
         <a class="plan-link" href="buy/?plan=plus">Choose Plus</a>
       </article>
       <article class="plan" data-plan="plus_voice">
-        <div class="plan-kicker" aria-hidden="true"></div><div class="name">Plus Voice</div><div class="price">$14.99<span>/month</span></div><div class="cr">4,000 credits</div>
-        <ul><li>Everything in Plus</li><li><span class="voice-count">150</span> voice turns with speech included</li><li>20% off one-time extra credits</li></ul>
-        <a class="plan-link" href="buy/?plan=plus_voice">Choose Plus Voice</a>
+        <div class="plan-kicker">Most Popular</div><div class="name">Premium</div><div class="price"><span class="amount">$14.99</span><span>/month</span></div><div class="cr">6,000 AI Credits · 300 Voice Credits</div>
+        <ul><li>Best for voice</li><li>Everything in Plus</li><li>20% off one-time extra AI Credits</li></ul>
+        <a class="plan-link" href="buy/?plan=plus_voice">Choose Premium</a>
       </article>
       <article class="plan feature" data-plan="pro">
-        <div class="plan-kicker">Best value</div><div class="name">Pro</div><div class="price">$29.99<span>/month</span></div><div class="cr">15,000 credits</div>
-        <ul><li>Everything in Plus Voice</li><li><span class="voice-count">300</span> voice turns with speech included</li><li>40% off one-time extra credits</li></ul>
+        <div class="plan-kicker" aria-hidden="true"></div><div class="name">Pro</div><div class="price"><span class="amount">$24.99</span><span>/month</span></div><div class="cr">12,000 AI Credits · 600 Voice Credits</div>
+        <ul><li>Best for heavy overall usage</li><li>Everything in Premium</li><li>40% off one-time extra AI Credits</li></ul>
         <a class="plan-link" href="buy/?plan=pro">Choose Pro</a>
       </article>
     </div>
-    <div class="credit-note">An included voice turn covers the speech for one voice question and Taki's spoken reply; the AI request still uses plan credits. Need more before your cycle resets? <a href="buy/?plan=credits">Add one-time extra credits</a>. Purchased credits expire 90 days after they are granted.</div>
+    <div class="credit-note">AI Credits power every AI response. Voice requests use normal AI Credits plus 1 Voice Credit. When Voice Credits run out, voice remains available for an additional 40 AI Credits per request. The full charge is checked before the request starts. Need more before your cycle refreshes? <a href="buy/?plan=credits">Add one-time extra AI Credits</a>. Purchased AI Credits expire 90 days after they are granted.</div>
   </div>
 </section>
 
@@ -140,10 +139,11 @@
     for (const plan of data.plans || []) {
       const card = document.querySelector(`[data-plan="${plan.key}"]`);
       if (!card) continue;
-      card.querySelector(".price").childNodes[0].nodeValue = `$${Number(plan.priceUsd).toFixed(2)}`;
-      card.querySelector(".cr").textContent = `${Number(plan.creditsPerCycle).toLocaleString()} credits`;
-      const voice = card.querySelector(".voice-count");
-      if (voice && Number.isFinite(plan.includedVoiceTurns)) voice.textContent = Number(plan.includedVoiceTurns).toLocaleString();
+      const price = Number(plan.priceUsd);
+      const credits = Number(plan.creditsPerCycle);
+      const voiceCredits = Number(plan.voiceCreditsPerCycle || plan.voiceCredits || 0);
+      if (Number.isFinite(price)) card.querySelector(".amount").textContent = `$${price.toFixed(2)}`;
+      if (Number.isFinite(credits)) card.querySelector(".cr").textContent = `${credits.toLocaleString()} AI Credits · ${voiceCredits.toLocaleString()} Voice Credits`;
     }
   } catch {}
 })();
