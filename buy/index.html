@@ -167,6 +167,13 @@ $("next").onclick = async () => {
     const response = await fetch(API + "/api/credits/account-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity }) });
     const data = await response.json();
     if (!data.valid) { setMessage("msg1", data.reason || "We couldn't find that account.", "err"); $("next").disabled = false; return; }
+    handoffToken = typeof data.checkoutToken === "string" ? data.checkoutToken : "";
+    if (!handoffToken) {
+      setMessage("msg1", "Secure checkout could not be prepared. Refresh and try again.", "err");
+      $("next").disabled = false;
+      return;
+    }
+    sessionStorage.setItem("takiPurchaseHandoff", handoffToken);
     account = { id: identity, tier: data.tier || "free", isPro: !!data.isPro, appleSynced: !!data.appleSynced, email: data.email || "", displayName: data.displayName || `Account ${identity}`, devices: Array.isArray(data.devices) ? data.devices : [] };
     if (typeof data.min === "number") { MIN = data.min; MAX = data.max; }
     if (typeof data.centsPerCredit === "number") CENTS_PER_CREDIT = data.centsPerCredit;
@@ -203,7 +210,8 @@ $("confirmAccount").onclick = async () => {
   if (selectedProduct === "credits") { closeConfirmation(); showAmountStep(); return; }
   $("confirmAccount").disabled = true; setMessage("confirmMsg", "Opening secure monthly checkout…");
   try {
-    const response = await fetch(API + "/api/plans/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, tier: selectedProduct }) });
+    const body = { handoffToken, tier: selectedProduct };
+    const response = await fetch(API + "/api/plans/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await response.json();
     if (data.url) { location.href = data.url; return; }
     setMessage("confirmMsg", data.error || "Could not start checkout.", "err");
@@ -235,7 +243,8 @@ $("buyCredits").onclick = async () => {
   if (priceUsd(selectedCredits) == null) return;
   $("buyCredits").disabled = true; setMessage("msg2", "Opening secure checkout…");
   try {
-    const response = await fetch(API + "/api/credits/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity: account.id, credits: selectedCredits, handoffToken }) });
+    const body = { credits: selectedCredits, handoffToken };
+    const response = await fetch(API + "/api/credits/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await response.json();
     if (data.url) {
       sessionStorage.removeItem("takiPurchaseHandoff");
