@@ -164,7 +164,7 @@ $("next").onclick = async () => {
   const identity = normalizeIdentity($("identity").value);
   $("next").disabled = true; setMessage("msg1", "Checking your account…");
   try {
-    const response = await fetch(API + "/api/credits/account-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity }) });
+    const response = await fetch(API + "/api/credits/account-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identity, purpose: selectedProduct === "credits" ? "credits" : "checkout" }) });
     const data = await response.json();
     if (!data.valid) { setMessage("msg1", data.reason || "We couldn't find that account.", "err"); $("next").disabled = false; return; }
     handoffToken = typeof data.checkoutToken === "string" ? data.checkoutToken : "";
