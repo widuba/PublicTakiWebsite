@@ -173,12 +173,21 @@ $("next").onclick = async () => {
       $("next").disabled = false;
       return;
     }
+    // The initial lookup intentionally omits personal fields. Exchange the
+    // short-lived signed token before showing confirmation so the UI never
+    // guesses a name or incorrectly reports Apple as disconnected.
+    const detailResponse = await fetch(API + "/api/credits/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: handoffToken }) });
+    const details = await detailResponse.json();
+    if (!detailResponse.ok || !details.valid) throw new Error(details.reason || "We couldn't load the account confirmation details.");
     sessionStorage.setItem("takiPurchaseHandoff", handoffToken);
-    account = { id: identity, tier: data.tier || "free", isPro: !!data.isPro, appleSynced: !!data.appleSynced, email: data.email || "", displayName: data.displayName || `Account ${identity}`, devices: Array.isArray(data.devices) ? data.devices : [] };
-    if (typeof data.min === "number") { MIN = data.min; MAX = data.max; }
-    if (typeof data.centsPerCredit === "number") CENTS_PER_CREDIT = data.centsPerCredit;
+    account = { id: details.identity || identity, tier: details.tier || data.tier || "free", isPro: !!details.isPro, appleSynced: details.appleSynced === true, email: details.email || "", displayName: details.displayName || "Taki account", devices: Array.isArray(details.devices) ? details.devices : [] };
+    if (typeof details.min === "number") { MIN = details.min; MAX = details.max; }
+    if (typeof details.centsPerCredit === "number") CENTS_PER_CREDIT = details.centsPerCredit;
     setMessage("msg1", ""); showConfirmation();
-  } catch { setMessage("msg1", "Network error. Please try again.", "err"); $("next").disabled = false; }
+  } catch (error) {
+    setMessage("msg1", error instanceof Error && error.message ? error.message : "Network error. Please try again.", "err");
+    $("next").disabled = false;
+  }
 };
 
 function showConfirmation() {
